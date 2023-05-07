@@ -35,5 +35,5 @@ def classFactory(iface):  # pylint: disable=invalid-name
     :type iface: QgsInterface
     """
     #
-    from .ponto_controle import PontoControlePlugin
-    return PontoControlePlugin()
+    from .trafegabilidade import TrafegabilidadePlugin
+    return TrafegabilidadePlugin()

@@ -34,7 +34,7 @@ import sys
 import inspect
 
 from qgis.core import QgsProcessingAlgorithm, QgsApplication
-from .ponto_controle_provider import PontoControleProvider
+from .trafegabilidade_provider import TrafegabilidadeProvider
 
 cmd_folder = os.path.split(inspect.getfile(inspect.currentframe()))[0]
 
@@ -42,14 +42,14 @@ if cmd_folder not in sys.path:
     sys.path.insert(0, cmd_folder)
 
 
-class PontoControlePlugin(object):
+class TrafegabilidadePlugin(object):
 
     def __init__(self):
         self.provider = None
 
     def initProcessing(self):
         """Init Processing provider for QGIS >= 3.8."""
-        self.provider = PontoControleProvider()
+        self.provider = TrafegabilidadeProvider()
         QgsApplication.processingRegistry().addProvider(self.provider)
 
     def initGui(self):

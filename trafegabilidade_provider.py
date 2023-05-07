@@ -31,7 +31,7 @@ __revision__ = '$Format:%H$'
 
 from qgis.core import QgsProcessingProvider
 
-class PontoControleProvider(QgsProcessingProvider):
+class TrafegabilidadeProvider(QgsProcessingProvider):
     '''
     Provider do handle the algorithms
     '''
