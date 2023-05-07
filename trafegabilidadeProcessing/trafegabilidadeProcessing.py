@@ -17,6 +17,7 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingException,
                        QgsProcessingAlgorithm,
                        QgsProcessingParameterFeatureSource,
+                       QgsProcessingParameterString,
                        QgsProcessingParameterFeatureSink)
 from qgis import processing
 
@@ -41,7 +42,8 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
 
     INPUT = 'INPUT'
     OUTPUT = 'OUTPUT'
-    
+    MI = 'MI'
+
     def tr(self, string):
         """
         Returns a translatable string with the self.tr() function.
@@ -111,6 +113,13 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             )
         )
 
+        self.addParameter(
+            QgsProcessingParameterString(
+                self.MI,
+                self.tr('MI')
+            )
+        )
+
         # We add a feature sink in which to store our processed features (this
         # usually takes the form of a newly created vector layer when the
         # algorithm is run in QGIS).
@@ -132,6 +141,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         source = self.parameterAsSource(
             parameters,
             self.INPUT,
+            self.MI,
             context
         )
 
