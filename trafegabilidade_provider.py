@@ -70,7 +70,7 @@ class TrafegabilidadeProvider(QgsProcessingProvider):
 
         This string should be short (e.g. "Lastools") and localised.
         """
-        return self.tr('Mapa de Trafegabilidade')
+        return self.tr('PFC 2023')
 
     def icon(self):
         """
