@@ -106,7 +106,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT,
-                self.tr('Input layer'),
+                self.tr('Camada de Entrada'),
                 [QgsProcessing.TypeVectorAnyGeometry]
             )
         )
@@ -117,7 +117,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT,
-                self.tr('Output layer')
+                self.tr('Camada de Saída')
             )
         )
 
