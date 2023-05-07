@@ -30,6 +30,7 @@ __copyright__ = '(C) 2019 by 1CGEO/DSG'
 __revision__ = '$Format:%H$'
 
 from qgis.core import QgsProcessingProvider
+from .trafegabilidadeProcessing.trafegabilidadeProcessing import TrafegabilidadeProcessingAlgorithm
 
 class TrafegabilidadeProvider(QgsProcessingProvider):
     '''
@@ -52,6 +53,7 @@ class TrafegabilidadeProvider(QgsProcessingProvider):
         """
         Loads all algorithms belonging to this provider.
         """
+        self.addAlgorithm(TrafegabilidadeProcessingAlgorithm())
 
     def id(self):
         """
