@@ -20,7 +20,7 @@ import numpy as np
 from math import floor, modf
 import math
 from pyproj.crs import CRS
-from lftools.geocapt.topogeo import azimute
+from .topogeo import azimute
 from qgis.core import (QgsGeometry,
                        QgsPointXY,
                        QgsCoordinateTransform,
