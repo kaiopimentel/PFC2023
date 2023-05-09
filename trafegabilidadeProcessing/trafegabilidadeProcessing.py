@@ -22,9 +22,10 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingParameterString,
                        QgsProcessingParameterFeatureSink,
                        QgsProcessingParameterCrs,
+                       QgsProcessingParameterExtent,
+                       QgsProcessingParameterEnum,
+                       QgsProcessingParameterRasterDestination,
                        QgsApplication,
-                       QgsProcessingContext,
-                       QgsProcessingFeedback,
                        QgsCoordinateReferenceSystem,
                        QgsCoordinateTransform,
                        QgsFields,
@@ -32,10 +33,15 @@ from qgis.core import (QgsProcessing,
                        QgsWkbTypes,
                        QgsPointXY,
                        QgsFeature,
-                       QgsGeometry)
+                       QgsGeometry,
+                       QgsProject,
+                       QgsSettings)
 from qgis import processing
 
 from numpy import array
+import requests
+import inspect
+
 from .cartography import reprojectPoints, mi2inom, inom2mi
 
 class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
@@ -144,7 +150,8 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterCrs(
                 self.CRS,
-                self.tr('SRC da Moldura')
+                self.tr('SRC da Moldura'),
+                'ProjectCrs'
 			)
 		)
 
@@ -158,6 +165,13 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             )
         )
         
+        self.addParameter(
+            QgsProcessingParameterRasterDestination(
+                self.OUTPUT,
+                self.tr('Output Raster')
+            )
+        )
+
     def processAlgorithm(self, parameters, context, feedback):
         """
         Here is where the processing itself takes place.
@@ -206,6 +220,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         # GridDownload.processAlgorithm(parameters=inom2utm_parameters, context=context_aux, feedback=feedback_aux)
 
         ###############################################################################################################################
+        # LFTools
         # Checking for geographic coordinate reference system
         if not crs.isGeographic():
             crsGeo = QgsCoordinateReferenceSystem(crs.geographicCrsAuthId())
@@ -343,10 +358,66 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         if sink is None:
             raise QgsProcessingException(self.invalidSinkError(parameters, self.FRAME))
 
-        feedback.pushInfo(self.tr('Operação finalizada com sucesso!'))
-        feedback.pushInfo(self.tr('Leandro França - Eng Cart'))
+        ###############################################################################################################################
+        #OpenTopography
 
-        return {self.FRAME: dest_id}
+        outputs = {}
+
+        if crs.authid() != "EPSG:4326":
+            extent = QgsCoordinateTransform(
+                crs,
+                QgsCoordinateReferenceSystem("EPSG:4326"),
+                QgsProject.instance(),
+            ).transformBoundingBox(extent)
+
+        extent = geom.boundingBox()
+        south = extent.yMinimum()
+        north = extent.yMaximum()
+        west = extent.xMinimum()
+        east = extent.xMaximum()
+
+        parameters['API_key'] = '2f976117b55394b5ba0915c318258d9a'
+        parameters['Extent'] = extent
+        parameters['DEMs'] = 0
+
+        dem_code = 'SRTMGL3'
+
+        dem_url = f'https://portal.opentopography.org/API/globaldem?demtype={dem_code}&south={south}&north={north}&west={west}&east={east}&outputFormat=GTiff'
+        dem_url=dem_url + "&API_Key=" + parameters['API_key']
+
+        dem_file = self.parameterAsFileOutput(parameters, self.OUTPUT, context)
+        try:
+            # Download file
+            alg_params = {
+                'URL': dem_url,
+                'OUTPUT': dem_file
+            }
+            outputs['DownloadFile'] = processing.run('native:filedownloader', alg_params, context=context, feedback=feedback, is_child_algorithm=True)
+        except:
+            response = requests.request("GET", dem_url, headers={}, data={})
+            
+            raise QgsProcessingException (response.text.split('<error>')[1][:-8])
+
+
+        # Load layer into project
+        dem_file_name = os.path.basename(dem_file)
+        if dem_file_name == 'OUTPUT.tif':
+            alg_params = {           
+                'INPUT': outputs['DownloadFile']['OUTPUT'],
+                'NAME': dem_code+"[Memory]"
+            }
+        else:
+            alg_params = {           
+                'INPUT': dem_file,
+                'NAME': dem_file_name
+            }
+        outputs['LoadLayerIntoProject'] = processing.run('native:loadlayer', alg_params, context=context, feedback=feedback, is_child_algorithm=True)
+    
+        feedback.pushInfo(self.tr('Operação finalizada com sucesso!'))
+        feedback.pushInfo(f'{south} {north} {west} {east}')
+        feedback.pushInfo(f'{dem_url}')
+
+        return {}
         ###############################################################################################################################
         
         # Send some information to the user
