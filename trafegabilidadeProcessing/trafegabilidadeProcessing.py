@@ -43,6 +43,7 @@ import requests
 import inspect
 
 from .cartography import reprojectPoints, mi2inom, inom2mi
+from .calculo_declividade import calculate_slope
 
 class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
     """
@@ -416,6 +417,8 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo(self.tr('Operação finalizada com sucesso!'))
         feedback.pushInfo(f'{south} {north} {west} {east}')
         feedback.pushInfo(f'{dem_url}')
+
+        
 
         return {}
         ###############################################################################################################################

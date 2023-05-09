@@ -32,13 +32,13 @@ def calculate_slope(raster_layer, output_path):
     out_band.SetNoDataValue(-9999)
     out_ds = None
 
-# Substitua as seguintes strings com o nome da camada e o caminho de saída
-input_layer_name = 'MDE_26124so_v1'
-output_path = 'C:/Users/Kaio/Downloads/output.tif'
+# # Substitua as seguintes strings com o nome da camada e o caminho de saída
+# input_layer_name = 'MDE_26124so_v1'
+# output_path = 'C:/Users/Kaio/Downloads/output.tif'
 
-input_layer = QgsProject.instance().mapLayersByName(input_layer_name)[0]
-calculate_slope(input_layer, output_path)
+# input_layer = QgsProject.instance().mapLayersByName(input_layer_name)[0]
+# calculate_slope(input_layer, output_path)
 
-# Carregar a camada de declividade no QGIS
-slope_layer = QgsRasterLayer(output_path, 'Slope')
-QgsProject.instance().addMapLayer(slope_layer)
+# # Carregar a camada de declividade no QGIS
+# slope_layer = QgsRasterLayer(output_path, 'Slope')
+# QgsProject.instance().addMapLayer(slope_layer)
