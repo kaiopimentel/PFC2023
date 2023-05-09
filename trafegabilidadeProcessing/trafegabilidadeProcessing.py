@@ -13,6 +13,7 @@
 
 import os
 import sys
+from osgeo import gdal
 from qgis.PyQt.QtCore import QCoreApplication, QVariant
 from qgis.core import (QgsProcessing,
                        QgsFeatureSink,
@@ -35,7 +36,8 @@ from qgis.core import (QgsProcessing,
                        QgsFeature,
                        QgsGeometry,
                        QgsProject,
-                       QgsSettings)
+                       QgsSettings,
+                       QgsRasterLayer)
 from qgis import processing
 
 from numpy import array
@@ -418,58 +420,36 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo(f'{south} {north} {west} {east}')
         feedback.pushInfo(f'{dem_url}')
 
+        ###############################################################################################################################
+
+        # Substitua as seguintes strings com o nome da camada e o caminho de saída
+
+        # obter o caminho da pasta temporária do usuário
+        temp_dir = os.environ['TEMP'] or os.environ['TMP'] or '/tmp'
+        # construir o caminho completo
+        raster_path = os.path.join(temp_dir, 'processing_AFFkPB', '22389b3e08584a6180052942f6df49c4', 'OUTPUT.tif')
+
+        raster_layer = QgsRasterLayer(raster_path, 'MDE')
+        if not raster_layer.isValid():
+            feedback.pushInfo(f'Erro ao carregar o raster: {raster_layer.lastError().message()}')
+        else:
+            # Adiciona a camada raster ao projeto do QGIS
+            QgsProject.instance().addMapLayer(raster_layer)
+
+        input_layer = QgsProject.instance().mapLayersByName("MDE")[0]
         
+        feedback.pushInfo(f'{type(input_layer)}')
+        feedback.pushInfo(f'{(outputs)}')
+        # output_ds = calculate_slope(input_layer)
+
+        # # Criar uma camada do QGIS a partir do dataset em memória e adicioná-la ao projeto
+        # output_uri = '/vsimem/slope.tif'
+        # gdal.GetDriverByName('GTiff').CreateCopy(output_uri, output_ds)
+        # slope_layer = QgsRasterLayer(output_uri, 'Slope', 'gdal')
+        # QgsProject.instance().addMapLayer(slope_layer)
+
 
         return {}
         ###############################################################################################################################
         
-        # Send some information to the user
-        # feedback.pushInfo('CRS is {}'.format(source.sourceCrs().authid()))
-
-        # If sink was not created, throw an exception to indicate that the algorithm
-        # encountered a fatal error. The exception text can be any string, but in this
-        # case we use the pre-built invalidSinkError method to return a standard
-        # helper text for when a sink cannot be evaluated
-        # if sink is None:
-        #     raise QgsProcessingException(self.invalidSinkError(parameters, self.OUTPUT))
-
-        # Compute the number of steps to display within the progress bar and
-        # get features from source
-        # total = 100.0 / source.featureCount() if source.featureCount() else 0
-        # features = source.getFeatures()
-
-        # for current, feature in enumerate(features):
-        #     # Stop the algorithm if cancel button has been clicked
-        #     if feedback.isCanceled():
-        #         break
-
-        #     # Add a feature in the sink
-        #     sink.addFeature(feature, QgsFeatureSink.FastInsert)
-
-        #     # Update the progress bar
-        #     feedback.setProgress(int(current * total))
-
-        # To run another Processing algorithm as part of this algorithm, you can use
-        # processing.run(...). Make sure you pass the current context and feedback
-        # to processing.run to ensure that all temporary layer outputs are available
-        # to the executed algorithm, and that the executed algorithm can send feedback
-        # reports to the user (and correctly handle cancellation and progress reports!)
-        if False:
-            buffered_layer = processing.run("native:buffer", {
-                'INPUT': dest_id,
-                'DISTANCE': 1.5,
-                'SEGMENTS': 5,
-                'END_CAP_STYLE': 0,
-                'JOIN_STYLE': 0,
-                'MITER_LIMIT': 2,
-                'DISSOLVE': False,
-                'OUTPUT': 'memory:'
-            }, context=context, feedback=feedback)['OUTPUT']
-
-        # Return the results of the algorithm. In this case our only result is
-        # the feature sink which contains the processed features, but some
-        # algorithms may return multiple feature sinks, calculated numeric
-        # statistics, etc. These should all be included in the returned
-        # dictionary, with keys matching the feature corresponding parameter
-        # or output names.
-        return {self.OUTPUT: dest_id}
+    
