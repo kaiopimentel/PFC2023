@@ -424,10 +424,14 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
 
         # Substitua as seguintes strings com o nome da camada e o caminho de saída
 
-        # obter o caminho da pasta temporária do usuário
-        temp_dir = os.environ['TEMP'] or os.environ['TMP'] or '/tmp'
-        # construir o caminho completo
-        raster_path = os.path.join(temp_dir, 'processing_AFFkPB', '22389b3e08584a6180052942f6df49c4', 'OUTPUT.tif')
+        raster_path = outputs["DownloadFile"]["OUTPUT"]
+        feedback.pushInfo(f'{raster_path}')
+        feedback.pushInfo(f'{alg_params}')
+
+        # # obter o caminho da pasta temporária do usuário
+        # temp_dir = os.environ['TEMP'] or os.environ['TMP'] or '/tmp'
+        # # construir o caminho completo
+        # raster_path = os.path.join(temp_dir, 'processing_AFFkPB', '22389b3e08584a6180052942f6df49c4', 'OUTPUT.tif')
 
         raster_layer = QgsRasterLayer(raster_path, 'MDE')
         if not raster_layer.isValid():
@@ -436,17 +440,18 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             # Adiciona a camada raster ao projeto do QGIS
             QgsProject.instance().addMapLayer(raster_layer)
 
-        input_layer = QgsProject.instance().mapLayersByName("MDE")[0]
+        # input_layer = QgsProject.instance().mapLayersByName("MDE")[0]
         
-        output_ds = calculate_slope(input_layer)
-        feedback.pushInfo(f'{type(output_ds)}')
-        QgsProject.instance().addMapLayer(output_ds)
+        # output_ds = calculate_slope(input_layer)
+        # feedback.pushInfo(f'{type(output_ds)}')
+        # QgsProject.instance().addMapLayer(output_ds)
         # QgsProject.instance().addMapLayer(output_ds)
         # # Criar uma camada do QGIS a partir do dataset em memória e adicioná-la ao projeto
         # output_uri = '/vsimem/slope.tif'
         # gdal.GetDriverByName('GTiff').CreateCopy(output_uri, output_ds)
         # slope_layer = QgsRasterLayer(output_uri, 'Slope', 'gdal')
         # QgsProject.instance().addMapLayer(slope_layer)
+        
 
 
         return {}
