@@ -45,7 +45,7 @@ import requests
 import inspect
 
 from .cartography import reprojectPoints, mi2inom, inom2mi
-from .calculo_declividade import calculate_slope
+from .test_calc import calculate_slope
 
 class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
     """
@@ -438,10 +438,10 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
 
         input_layer = QgsProject.instance().mapLayersByName("MDE")[0]
         
-        feedback.pushInfo(f'{type(input_layer)}')
-        feedback.pushInfo(f'{(outputs)}')
-        # output_ds = calculate_slope(input_layer)
-
+        output_ds = calculate_slope(input_layer)
+        feedback.pushInfo(f'{type(output_ds)}')
+        QgsProject.instance().addMapLayer(output_ds)
+        # QgsProject.instance().addMapLayer(output_ds)
         # # Criar uma camada do QGIS a partir do dataset em memória e adicioná-la ao projeto
         # output_uri = '/vsimem/slope.tif'
         # gdal.GetDriverByName('GTiff').CreateCopy(output_uri, output_ds)
