@@ -43,9 +43,10 @@ from qgis import processing
 from numpy import array
 import requests
 import inspect
+import tempfile
 
 from .cartography import reprojectPoints, mi2inom, inom2mi
-from .test_calc import calculate_slope
+from .calculo_declividade import calculate_slope
 
 class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
     """
@@ -71,6 +72,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
     FRAME = 'FRAME'
     CRS = 'CRS'
     LOC = QgsApplication.locale()[:2]   
+    SLOPE = 'SLOPE'
 
     def tr(self, string):
         """
@@ -175,6 +177,13 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             )
         )
 
+        self.addParameter(
+            QgsProcessingParameterRasterDestination(
+                self.SLOPE,
+                self.tr('Output Slope')
+            )
+        )
+
     def processAlgorithm(self, parameters, context, feedback):
         """
         Here is where the processing itself takes place.
@@ -195,32 +204,6 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             self.CRS,
             context
         )
-
-        # If source was not found, throw an exception to indicate that the algorithm
-        # encountered a fatal error. The exception text can be any string, but in this
-        # case we use the pre-built invalidSourceError method to return a standard
-        # helper text for when a source cannot be evaluated
-        # if source is None:
-        #     raise QgsProcessingException(self.invalidSourceError(parameters, self.INPUT))
-
-        # (sink, dest_id) = self.parameterAsSink(
-        #     parameters,
-        #     self.OUTPUT,
-        #     context
-        #     # source.fields(),
-        #     # source.wkbType(),
-        #     # source.sourceCrs()
-        # )
-        
-        # context_aux = QgsProcessingContext()
-        # crs_aux = QgsCoordinateReferenceSystem(4326)
-        
-        # feedback_aux = QgsProcessingFeedback()
-
-        # inom2utm_parameters = {'NAME':mi, 'TYPE':0, 'CRS':crs, 'FRAME':'TEMPORARY_OUTPUT'}
-        # feedback.pushInfo(f'{inom2utm_parameters}')
-        # GridDownload = Inom2utmGrid()
-        # GridDownload.processAlgorithm(parameters=inom2utm_parameters, context=context_aux, feedback=feedback_aux)
 
         ###############################################################################################################################
         # LFTools
@@ -406,7 +389,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         dem_file_name = os.path.basename(dem_file)
         if dem_file_name == 'OUTPUT.tif':
             alg_params = {           
-                'INPUT': outputs['DownloadFile']['OUTPUT'],
+                'INPUT': dem_file,
                 'NAME': dem_code+"[Memory]"
             }
         else:
@@ -414,11 +397,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
                 'INPUT': dem_file,
                 'NAME': dem_file_name
             }
-        outputs['LoadLayerIntoProject'] = processing.run('native:loadlayer', alg_params, context=context, feedback=feedback, is_child_algorithm=True)
-    
-        feedback.pushInfo(self.tr('Operação finalizada com sucesso!'))
-        feedback.pushInfo(f'{south} {north} {west} {east}')
-        feedback.pushInfo(f'{dem_url}')
+        # outputs['LoadLayerIntoProject'] = processing.run('native:loadlayer', alg_params, context=context, feedback=feedback, is_child_algorithm=True)
 
         ###############################################################################################################################
 
@@ -427,11 +406,8 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         raster_path = outputs["DownloadFile"]["OUTPUT"]
         feedback.pushInfo(f'{raster_path}')
         feedback.pushInfo(f'{alg_params}')
-
-        # # obter o caminho da pasta temporária do usuário
-        # temp_dir = os.environ['TEMP'] or os.environ['TMP'] or '/tmp'
-        # # construir o caminho completo
-        # raster_path = os.path.join(temp_dir, 'processing_AFFkPB', '22389b3e08584a6180052942f6df49c4', 'OUTPUT.tif')
+        feedback.pushInfo(f'{type(dem_file)}, {dem_file}')
+        feedback.pushInfo(f'{type(dem_file_name)}, {dem_file_name}')
 
         raster_layer = QgsRasterLayer(raster_path, 'MDE')
         if not raster_layer.isValid():
@@ -440,19 +416,39 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             # Adiciona a camada raster ao projeto do QGIS
             QgsProject.instance().addMapLayer(raster_layer)
 
-        # input_layer = QgsProject.instance().mapLayersByName("MDE")[0]
+        input_layer = QgsProject.instance().mapLayersByName("MDE")[0]
         
         # output_ds = calculate_slope(input_layer)
         # feedback.pushInfo(f'{type(output_ds)}')
         # QgsProject.instance().addMapLayer(output_ds)
-        # QgsProject.instance().addMapLayer(output_ds)
-        # # Criar uma camada do QGIS a partir do dataset em memória e adicioná-la ao projeto
-        # output_uri = '/vsimem/slope.tif'
-        # gdal.GetDriverByName('GTiff').CreateCopy(output_uri, output_ds)
-        # slope_layer = QgsRasterLayer(output_uri, 'Slope', 'gdal')
-        # QgsProject.instance().addMapLayer(slope_layer)
         
+        # # Substitua a string abaixo com o nome da camada
+        # input_layer_name = 'SRTMGL3[Memory]'
+        # input_layer = QgsProject.instance().mapLayersByName(input_layer_name)[0]
 
+        # # Criar um arquivo temporário no disco
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.tif')
+        temp_file.close()
+
+        slope_file = self.parameterAsFileOutput(parameters, self.SLOPE, context)
+        feedback.pushInfo(f'{slope_file}')
+
+        # # Calcular a declividade e criar a camada temporária em arquivo
+        calculate_slope(input_layer, slope_file)
+
+        # # Carregar a camada de declividade no QGIS
+        slope_layer = QgsRasterLayer(slope_file, 'Slope')
+        QgsProject.instance().addMapLayer(slope_layer)
+
+        # outputs['LoadLayerIntoProject'] = processing.run('native:loadlayer', alg_params, context=context, feedback=feedback, is_child_algorithm=True)
+
+        # Remover o arquivo temporário do disco quando não for mais necessário
+        # (exemplo: ao fechar o QGIS ou ao executar algum outro código)
+        # os.remove(temp_file.name)
+        
+        
+        feedback.pushInfo(f'{outputs["DownloadFile"]["OUTPUT"]}')
+        feedback.pushInfo(f'{dem_file}')
 
         return {}
         ###############################################################################################################################
