@@ -427,19 +427,29 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         # input_layer = QgsProject.instance().mapLayersByName(input_layer_name)[0]
 
         # # Criar um arquivo temporário no disco
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.tif')
-        temp_file.close()
+        # temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.tif')
+        # temp_file.close()
 
-        slope_file = self.parameterAsFileOutput(parameters, self.SLOPE, context)
-        feedback.pushInfo(f'{slope_file}')
+        slope_path = self.parameterAsFileOutput(parameters, self.SLOPE, context)
+        feedback.pushInfo(f'{slope_path}')
 
         # # Calcular a declividade e criar a camada temporária em arquivo
-        calculate_slope(input_layer, slope_file)
+        calculate_slope(input_layer, slope_path)
 
         # # Carregar a camada de declividade no QGIS
-        slope_layer = QgsRasterLayer(slope_file, 'Slope')
+        # slope_layer = QgsRasterLayer(slope_path, 'Slope')
+        # QgsProject.instance().addMapLayer(slope_layer)
+        
+        # alg_params_slope = {           
+        #         'INPUT': slope_path,
+        #         'NAME': "Slope"
+        #     }
+        # outputs['LoadSlopeLayerIntoProject'] = processing.run('native:loadlayer', alg_params_slope, context=context, feedback=feedback, is_child_algorithm=True)
+        
+        slope_layer = QgsRasterLayer(slope_path, "SLOPEX")
         QgsProject.instance().addMapLayer(slope_layer)
-
+        
+        # os.remove(slope_path)
         # outputs['LoadLayerIntoProject'] = processing.run('native:loadlayer', alg_params, context=context, feedback=feedback, is_child_algorithm=True)
 
         # Remover o arquivo temporário do disco quando não for mais necessário
@@ -447,8 +457,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         # os.remove(temp_file.name)
         
         
-        feedback.pushInfo(f'{outputs["DownloadFile"]["OUTPUT"]}')
-        feedback.pushInfo(f'{dem_file}')
+        feedback.pushInfo(f'{slope_path}')
 
         return {}
         ###############################################################################################################################
