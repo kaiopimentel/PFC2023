@@ -405,14 +405,15 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
 
         raster_path = outputs["DownloadFile"]["OUTPUT"]
 
-        raster_layer = QgsRasterLayer(raster_path, 'MDE')
+        
+        raster_layer = QgsRasterLayer(raster_path, f'MDE_{nome}')
         if not raster_layer.isValid():
             feedback.pushInfo(f'Erro ao carregar o raster: {raster_layer.lastError().message()}')
         else:
             # Adiciona a camada raster ao projeto do QGIS
             QgsProject.instance().addMapLayer(raster_layer)
 
-        input_layer = QgsProject.instance().mapLayersByName("MDE")[0]
+        # input_layer = QgsProject.instance().mapLayersByName(mde_name)[0]
         
         # slope_path = self.parameterAsFileOutput(parameters, self.SLOPE, context)
         # # feedback.pushInfo(f'{slope_path}')
@@ -427,30 +428,30 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         ############################################################ Descobrir Fuso UTM
 
         ponto_central = get_raster_center_point(dem_file)
-        feedback.pushInfo(f'{type(ponto_central)}')
-        feedback.pushInfo(f'{ponto_central}')
+        # feedback.pushInfo(f'{type(ponto_central)}')
+        # feedback.pushInfo(f'{ponto_central}')
         
         point_x = ponto_central.x()
         point_y = ponto_central.y()
-        feedback.pushInfo(f'x:{point_x}; y:{point_y}')
+        # feedback.pushInfo(f'x:{point_x}; y:{point_y}')
         
         # point = QgsPoint(longitude, latitude)
         utm_zone = get_zone_number(ponto_central.y(), ponto_central.x())
-        feedback.pushInfo(f'{type(utm_zone)}')
-        feedback.pushInfo(f'{utm_zone}')
+        # feedback.pushInfo(f'{type(utm_zone)}')
+        # feedback.pushInfo(f'{utm_zone}')
 
         if point_y <= 0:
             south_hemisphere = True
         else:
             south_hemisphere = False
 
-        feedback.pushInfo(f'{utm_zone[0:2]}')
-        feedback.pushInfo(f'{south_hemisphere}')
+        # feedback.pushInfo(f'{utm_zone[0:2]}')
+        # feedback.pushInfo(f'{south_hemisphere}')
 
         crs = CRS.from_dict({'proj': 'utm', 'zone': utm_zone[0:2], 'south': south_hemisphere})
         epsg = crs.to_authority()
 
-        feedback.pushInfo(f'{epsg[1]}')
+        # feedback.pushInfo(f'{epsg[1]}')
 
         ############################################################ Reprojetar
         
@@ -460,13 +461,14 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo(f'{reproj_dict}')
 
         reproj_path = reproj_dict['OUTPUT']
-        reproj_raster = QgsRasterLayer(reproj_path, 'REPROJ')
+        feedback.pushInfo(f'{reproj_dict["OUTPUT"]}')
+        reproj_raster = QgsRasterLayer(reproj_path, f'REPROJ_{nome}')
         QgsProject.instance().addMapLayer(reproj_raster)
         ############################################################ Cálculo Declividade
         
         slope_dict = processing.run("native:slope", {'INPUT':reproj_path,'Z_FACTOR':1,'OUTPUT':'TEMPORARY_OUTPUT'})
         slope_path = slope_dict['OUTPUT']
-        slope_raster = QgsRasterLayer(slope_path, 'SLOPE')
+        slope_raster = QgsRasterLayer(slope_path, f'SLOPE_{nome}')
         QgsProject.instance().addMapLayer(slope_raster)
         
         return {}
