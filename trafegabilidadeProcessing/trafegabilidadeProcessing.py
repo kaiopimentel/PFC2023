@@ -414,15 +414,15 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
 
         input_layer = QgsProject.instance().mapLayersByName("MDE")[0]
         
-        slope_path = self.parameterAsFileOutput(parameters, self.SLOPE, context)
-        # feedback.pushInfo(f'{slope_path}')
+        # slope_path = self.parameterAsFileOutput(parameters, self.SLOPE, context)
+        # # feedback.pushInfo(f'{slope_path}')
 
-        # Calcular a declividade e criar a camada temporária em arquivo
-        calculate_slope(input_layer, slope_path)
+        # # Calcular a declividade e criar a camada temporária em arquivo
+        # calculate_slope(input_layer, slope_path)
 
-        # Carregar a camada de declividade no QGIS
-        slope_layer = QgsRasterLayer(slope_path, 'Slope')
-        QgsProject.instance().addMapLayer(slope_layer)    
+        # # Carregar a camada de declividade no QGIS
+        # slope_layer = QgsRasterLayer(slope_path, 'Slope')
+        # QgsProject.instance().addMapLayer(slope_layer)    
 
         ############################################################ Descobrir Fuso UTM
 
@@ -464,9 +464,11 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         QgsProject.instance().addMapLayer(reproj_raster)
         ############################################################ Cálculo Declividade
         
-        # processing.run("native:slope", {'INPUT':'C:/Users/arthu/AppData/Local/Temp/processing_trgeDA/7538092d2e1f4bb29528cfdc0e5f9635/OUTPUT.tif','Z_FACTOR':1,'OUTPUT':'TEMPORARY_OUTPUT'})
-
-
+        slope_dict = processing.run("native:slope", {'INPUT':reproj_path,'Z_FACTOR':1,'OUTPUT':'TEMPORARY_OUTPUT'})
+        slope_path = slope_dict['OUTPUT']
+        slope_raster = QgsRasterLayer(slope_path, 'SLOPE')
+        QgsProject.instance().addMapLayer(slope_raster)
+        
         return {}
         ###############################################################################################################################
         
