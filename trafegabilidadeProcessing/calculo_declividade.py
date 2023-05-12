@@ -26,6 +26,8 @@ def calculate_slope(raster_layer, output_path):
     
     # Reprojetar o raster para UTM
     utm_src = reproject_raster_to_utm(src)
+    print(f'{type(utm_src)}')
+    print(utm_src)
 
     band = utm_src.GetRasterBand(1)
     gt = utm_src.GetGeoTransform()

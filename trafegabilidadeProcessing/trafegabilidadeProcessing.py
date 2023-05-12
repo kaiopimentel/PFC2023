@@ -37,16 +37,21 @@ from qgis.core import (QgsProcessing,
                        QgsGeometry,
                        QgsProject,
                        QgsSettings,
-                       QgsRasterLayer)
+                       QgsRasterLayer,
+                       QgsPoint)
 from qgis import processing
 
 from numpy import array
 import requests
 import inspect
 import tempfile
+from pyproj import *
+
 
 from .cartography import reprojectPoints, mi2inom, inom2mi
 from .calculo_declividade import calculate_slope
+from .get_central_coord import get_raster_center_point
+from .get_utm_zone import zone_number
 
 class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
     """
@@ -291,7 +296,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
                 d_lat = dic_delta[escalas[k]][cod][1]
                 lon += d_lon
                 lat += d_lat
-            feedback.pushInfo(self.tr('Origem')+': Longitude = {} e Latitude = {}'.format(lon, lat))
+            # feedback.pushInfo(self.tr('Origem')+': Longitude = {} e Latitude = {}'.format(lon, lat))
             valores = array([[3.0, 1.5, 0.5, 0.25, 0.125, 0.125/2, 0.125/2/2, 0.125/2/2/3, 0.125/2/2/3/2],
                                    [2.0, 1.0, 0.5, 0.25, 0.125, 0.125/3, 0.125/3/2, 0.125/3/2/2, 0.125/3/2/2/2]])
             d_lon = valores[0,k]
@@ -335,8 +340,8 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
                 mi = None
 
             att = [inom, mi, escala]
-        feedback.pushInfo('INOM: {}'.format(inom))
-        feedback.pushInfo('MI: {}'.format(mi))
+        # feedback.pushInfo('INOM: {}'.format(inom))
+        # feedback.pushInfo('MI: {}'.format(mi))
         feat.setGeometry(geom)
         feat.setAttributes(att)
         sink.addFeature(feat, QgsFeatureSink.FastInsert)
@@ -383,8 +388,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             response = requests.request("GET", dem_url, headers={}, data={})
             
             raise QgsProcessingException (response.text.split('<error>')[1][:-8])
-
-
+        
         # Load layer into project
         dem_file_name = os.path.basename(dem_file)
         if dem_file_name == 'OUTPUT.tif':
@@ -397,17 +401,12 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
                 'INPUT': dem_file,
                 'NAME': dem_file_name
             }
-        # outputs['LoadLayerIntoProject'] = processing.run('native:loadlayer', alg_params, context=context, feedback=feedback, is_child_algorithm=True)
 
         ###############################################################################################################################
 
         # Substitua as seguintes strings com o nome da camada e o caminho de saída
 
         raster_path = outputs["DownloadFile"]["OUTPUT"]
-        feedback.pushInfo(f'{raster_path}')
-        feedback.pushInfo(f'{alg_params}')
-        feedback.pushInfo(f'{type(dem_file)}, {dem_file}')
-        feedback.pushInfo(f'{type(dem_file_name)}, {dem_file_name}')
 
         raster_layer = QgsRasterLayer(raster_path, 'MDE')
         if not raster_layer.isValid():
@@ -418,47 +417,54 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
 
         input_layer = QgsProject.instance().mapLayersByName("MDE")[0]
         
-        # output_ds = calculate_slope(input_layer)
-        # feedback.pushInfo(f'{type(output_ds)}')
-        # QgsProject.instance().addMapLayer(output_ds)
-        
-        # # Substitua a string abaixo com o nome da camada
-        # input_layer_name = 'SRTMGL3[Memory]'
-        # input_layer = QgsProject.instance().mapLayersByName(input_layer_name)[0]
-
-        # # Criar um arquivo temporário no disco
-        # temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.tif')
-        # temp_file.close()
-
         slope_path = self.parameterAsFileOutput(parameters, self.SLOPE, context)
-        feedback.pushInfo(f'{slope_path}')
+        # feedback.pushInfo(f'{slope_path}')
 
-        # # Calcular a declividade e criar a camada temporária em arquivo
+        # Calcular a declividade e criar a camada temporária em arquivo
         calculate_slope(input_layer, slope_path)
 
-        # # Carregar a camada de declividade no QGIS
-        # slope_layer = QgsRasterLayer(slope_path, 'Slope')
-        # QgsProject.instance().addMapLayer(slope_layer)
-        
-        # alg_params_slope = {           
-        #         'INPUT': slope_path,
-        #         'NAME': "Slope"
-        #     }
-        # outputs['LoadSlopeLayerIntoProject'] = processing.run('native:loadlayer', alg_params_slope, context=context, feedback=feedback, is_child_algorithm=True)
-        
-        slope_layer = QgsRasterLayer(slope_path, "SLOPEX")
-        QgsProject.instance().addMapLayer(slope_layer)
-        
-        # os.remove(slope_path)
-        # outputs['LoadLayerIntoProject'] = processing.run('native:loadlayer', alg_params, context=context, feedback=feedback, is_child_algorithm=True)
+        # Carregar a camada de declividade no QGIS
+        slope_layer = QgsRasterLayer(slope_path, 'Slope')
+        QgsProject.instance().addMapLayer(slope_layer)    
 
-        # Remover o arquivo temporário do disco quando não for mais necessário
-        # (exemplo: ao fechar o QGIS ou ao executar algum outro código)
-        # os.remove(temp_file.name)
-        
-        
-        feedback.pushInfo(f'{slope_path}')
+        ############################################################ Descobrir Fuso UTM
 
+        ponto_central = get_raster_center_point(dem_file)
+        feedback.pushInfo(f'{type(ponto_central)}')
+        feedback.pushInfo(f'{ponto_central}')
+        # feedback.pushInfo(f'Coordenadas centrais: {ponto_central.asWktCoordinates()}')
+
+        # zone = get_utm_zone(ponto_central)
+        # feedback.pushInfo(f'{zone}')
+
+        # latitude = 40.7128
+        # longitude = -74.0060
+        
+        point_x = ponto_central.x()
+        point_y = ponto_central.y()
+        feedback.pushInfo(f'x:{point_x}; y:{point_y}')
+        
+        # point = QgsPoint(longitude, latitude)
+        utm_zone = zone_number(ponto_central.y(), ponto_central.x())
+        feedback.pushInfo(f'{type(utm_zone)}')
+        feedback.pushInfo(f'{utm_zone}')
+
+        # utm_proj = Proj(proj='utm', zone=utm_zone, ellps='WGS84', south=latitude<0)
+        # wgs84_proj = Proj(proj='latlong', datum='WGS84')
+
+        # x, y = transform(wgs84_proj, utm_proj, ponto_central.x(), ponto_central.y())
+        # utm_point = QgsPoint(x, y)
+        # feedback.pushInfo(f'{type(utm_point)}')
+        # feedback.pushInfo(f'{utm_point}')
+        
+        
+
+        ############################################################ Reprojetar
+        
+        # processing.run("gdal:warpreproject", {'INPUT':dem_file,'SOURCE_CRS':QgsCoordinateReferenceSystem('EPSG:4326'),'TARGET_CRS':QgsCoordinateReferenceSystem('EPSG:32731'),'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':30,'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,'TARGET_EXTENT_CRS':None,'MULTITHREADING':False,'EXTRA':'','OUTPUT':'TEMPORARY_OUTPUT'})
+
+        ############################################################ Cálculo Declividade
+        
         return {}
         ###############################################################################################################################
         
