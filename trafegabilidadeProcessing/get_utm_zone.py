@@ -10,7 +10,7 @@ def get_zone_number(latitude, longitude):
             return 35
         elif longitude < 42:
             return 37
-    if latitude >=0:
+    if latitude >= 0:
         return (str(int((longitude + 180) / 6) + 1) + "N")
     else:
         return (str(int((longitude + 180) / 6) + 1) + "S")

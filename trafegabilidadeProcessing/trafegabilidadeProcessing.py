@@ -43,6 +43,7 @@ from qgis import processing
 
 from numpy import array
 import requests
+from pyproj import CRS
 
 from .cartography import reprojectPoints, mi2inom, inom2mi
 from .calculo_declividade import calculate_slope
@@ -438,12 +439,27 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo(f'{type(utm_zone)}')
         feedback.pushInfo(f'{utm_zone}')
 
+        if point_y <= 0:
+            south_hemisphere = True
+        else:
+            south_hemisphere = False
+
+        feedback.pushInfo(f'{utm_zone[0:2]}')
+        feedback.pushInfo(f'{south_hemisphere}')
+
+        crs = CRS.from_dict({'proj': 'utm', 'zone': utm_zone[0:2], 'south': south_hemisphere})
+        epsg = crs.to_authority()
+
+        feedback.pushInfo(f'{epsg[1]}')
+
         ############################################################ Reprojetar
         
         # processing.run("gdal:warpreproject", {'INPUT':dem_file,'SOURCE_CRS':QgsCoordinateReferenceSystem('EPSG:4326'),'TARGET_CRS':QgsCoordinateReferenceSystem('EPSG:32731'),'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':30,'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,'TARGET_EXTENT_CRS':None,'MULTITHREADING':False,'EXTRA':'','OUTPUT':'TEMPORARY_OUTPUT'})
 
         ############################################################ Cálculo Declividade
         
+
+
         return {}
         ###############################################################################################################################
         
