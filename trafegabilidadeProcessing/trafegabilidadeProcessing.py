@@ -455,9 +455,16 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         ############################################################ Reprojetar
         
         # processing.run("gdal:warpreproject", {'INPUT':dem_file,'SOURCE_CRS':QgsCoordinateReferenceSystem('EPSG:4326'),'TARGET_CRS':QgsCoordinateReferenceSystem('EPSG:32731'),'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':30,'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,'TARGET_EXTENT_CRS':None,'MULTITHREADING':False,'EXTRA':'','OUTPUT':'TEMPORARY_OUTPUT'})
+        reproj_dict = processing.run("gdal:warpreproject", {'INPUT':dem_file,'SOURCE_CRS':QgsCoordinateReferenceSystem('EPSG:4326'),'TARGET_CRS':QgsCoordinateReferenceSystem(f'EPSG:{epsg[1]}'),'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':30,'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,'TARGET_EXTENT_CRS':None,'MULTITHREADING':False,'EXTRA':'','OUTPUT':'TEMPORARY_OUTPUT'})
+        feedback.pushInfo(f'{type(reproj_dict)}')
+        feedback.pushInfo(f'{reproj_dict}')
 
+        reproj_path = reproj_dict['OUTPUT']
+        reproj_raster = QgsRasterLayer(reproj_path, 'REPROJ')
+        QgsProject.instance().addMapLayer(reproj_raster)
         ############################################################ Cálculo Declividade
         
+        # processing.run("native:slope", {'INPUT':'C:/Users/arthu/AppData/Local/Temp/processing_trgeDA/7538092d2e1f4bb29528cfdc0e5f9635/OUTPUT.tif','Z_FACTOR':1,'OUTPUT':'TEMPORARY_OUTPUT'})
 
 
         return {}
