@@ -43,15 +43,11 @@ from qgis import processing
 
 from numpy import array
 import requests
-import inspect
-import tempfile
-from pyproj import *
-
 
 from .cartography import reprojectPoints, mi2inom, inom2mi
 from .calculo_declividade import calculate_slope
 from .get_central_coord import get_raster_center_point
-from .get_utm_zone import zone_number
+from .get_utm_zone import get_zone_number
 
 class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
     """
@@ -432,32 +428,15 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         ponto_central = get_raster_center_point(dem_file)
         feedback.pushInfo(f'{type(ponto_central)}')
         feedback.pushInfo(f'{ponto_central}')
-        # feedback.pushInfo(f'Coordenadas centrais: {ponto_central.asWktCoordinates()}')
-
-        # zone = get_utm_zone(ponto_central)
-        # feedback.pushInfo(f'{zone}')
-
-        # latitude = 40.7128
-        # longitude = -74.0060
         
         point_x = ponto_central.x()
         point_y = ponto_central.y()
         feedback.pushInfo(f'x:{point_x}; y:{point_y}')
         
         # point = QgsPoint(longitude, latitude)
-        utm_zone = zone_number(ponto_central.y(), ponto_central.x())
+        utm_zone = get_zone_number(ponto_central.y(), ponto_central.x())
         feedback.pushInfo(f'{type(utm_zone)}')
         feedback.pushInfo(f'{utm_zone}')
-
-        # utm_proj = Proj(proj='utm', zone=utm_zone, ellps='WGS84', south=latitude<0)
-        # wgs84_proj = Proj(proj='latlong', datum='WGS84')
-
-        # x, y = transform(wgs84_proj, utm_proj, ponto_central.x(), ponto_central.y())
-        # utm_point = QgsPoint(x, y)
-        # feedback.pushInfo(f'{type(utm_point)}')
-        # feedback.pushInfo(f'{utm_point}')
-        
-        
 
         ############################################################ Reprojetar
         

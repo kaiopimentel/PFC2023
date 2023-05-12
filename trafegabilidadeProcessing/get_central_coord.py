@@ -19,10 +19,4 @@ def get_raster_center_point(raster_path):
     # Criar um objeto QgsPointXY para representar as coordenadas centrais do raster
     center_point = QgsPointXY(x_center, y_center)
 
-    # # Obter a projeção espacial do raster
-    # projection = raster_layer.crs()
-
-    # # Definir a projeção espacial do objeto QgsPointXY para a projeção espacial do raster
-    # center_point.setCrs(projection)
-
     return center_point

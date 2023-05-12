@@ -1,8 +1,4 @@
-import math
-from qgis.core import QgsPoint
-from pyproj import Proj, transform
-
-def zone_number(latitude, longitude):
+def get_zone_number(latitude, longitude):
     if 56 <= latitude < 64 and 3 <= longitude < 12:
         return 32
     if 72 <= latitude <= 84 and longitude >= 0:
