@@ -13,6 +13,7 @@
 
 import os
 import sys
+import tempfile
 from osgeo import gdal
 from qgis.PyQt.QtCore import QCoreApplication, QVariant
 from qgis.core import (QgsProcessing,
@@ -38,7 +39,14 @@ from qgis.core import (QgsProcessing,
                        QgsProject,
                        QgsSettings,
                        QgsRasterLayer,
-                       QgsPoint)
+                       QgsPoint,
+                       QgsColorRampShader,
+                       QgsRasterShader,
+                       QgsSingleBandPseudoColorRenderer,
+                       QgsSingleBandPseudoColorRenderer, QgsColorRampShader, QgsRasterShader, QgsProject
+                       )
+from qgis.PyQt.QtGui import QColor
+from qgis.core import (QgsColorRampShader, QgsRasterShader, QgsSingleBandPseudoColorRenderer)
 from qgis import processing
 
 from numpy import array
@@ -75,6 +83,9 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
     CRS = 'CRS'
     LOC = QgsApplication.locale()[:2]   
     SLOPE = 'SLOPE'
+    MaxSlope = 'MaxSlope'
+    MapaTematico = 'MapaTematico'
+
 
     def tr(self, string):
         """
@@ -150,6 +161,12 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             QgsProcessingParameterString(
                 self.MI,
                 self.tr('MI'),
+            )
+        )
+        self.addParameter(
+            QgsProcessingParameterString(
+                self.MaxSlope,
+                self.tr('Declividade máxima permitida para trajeto'),
                 optional = True
             )
         )
@@ -185,6 +202,12 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
                 self.tr('Output Slope')
             )
         )
+        self.addParameter(
+            QgsProcessingParameterRasterDestination(
+                self.MapaTematico,
+                self.tr('Output Mapa Temático')
+            )
+        )        
 
     def processAlgorithm(self, parameters, context, feedback):
         """
@@ -471,7 +494,43 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         slope_raster = QgsRasterLayer(slope_path, f'SLOPE_{nome}')
         QgsProject.instance().addMapLayer(slope_raster)
         
+        ############################################################ Mapa Temático
+        max_slope = float(parameters[self.MaxSlope])
+        formula = f'(A < {max_slope}) * 1 + (A >= {max_slope}) * 0'
+
+        thematic_dict = processing.run("gdal:rastercalculator", {
+            'INPUT_A': slope_path, 'BAND_A': 1,
+            'INPUT_B': None, 'BAND_B': -1,
+            'INPUT_C': None, 'BAND_C': -1,
+            'INPUT_D': None, 'BAND_D': -1,
+            'INPUT_E': None, 'BAND_E': -1,
+            'INPUT_F': None, 'BAND_F': -1,
+            'FORMULA': formula,
+            'NO_DATA': None,
+            'RTYPE': 5,
+            'OPTIONS': '',
+            'EXTRA': '',
+            'OUTPUT': parameters[self.MapaTematico]
+        })
+
+        thematic_raster_path = thematic_dict['OUTPUT']
+
+        # Defina o estilo de cores contínuas
+        color_ramp = QgsColorRampShader()
+        color_ramp.setColorRampType(QgsColorRampShader.Interpolated)
+        color_ramp.setColorRampItemList([
+            QgsColorRampShader.ColorRampItem(0, QColor(255, 0, 0)),
+            QgsColorRampShader.ColorRampItem(1, QColor(0, 255, 0))
+        ])
+
+        shader = QgsRasterShader()
+        shader.setRasterShaderFunction(color_ramp)
+
+        thematic_raster = QgsRasterLayer(thematic_raster_path, f'MapaTematico_{nome}')
+        renderer = QgsSingleBandPseudoColorRenderer(thematic_raster.dataProvider(), 1, shader)
+        thematic_raster.setRenderer(renderer)
+
+        QgsProject.instance().addMapLayer(thematic_raster)
+
         return {}
         ###############################################################################################################################
-        
-    
