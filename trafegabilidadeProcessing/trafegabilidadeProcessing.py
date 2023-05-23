@@ -12,8 +12,6 @@
 """
 
 import os
-import sys
-import tempfile
 from osgeo import gdal
 from qgis.PyQt.QtCore import QCoreApplication, QVariant
 from qgis.core import (QgsProcessing,
@@ -24,10 +22,7 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingParameterString,
                        QgsProcessingParameterFeatureSink,
                        QgsProcessingParameterCrs,
-                       QgsProcessingParameterExtent,
-                       QgsProcessingParameterEnum,
                        QgsProcessingParameterRasterDestination,
-                       QgsApplication,
                        QgsCoordinateReferenceSystem,
                        QgsCoordinateTransform,
                        QgsFields,
@@ -37,16 +32,14 @@ from qgis.core import (QgsProcessing,
                        QgsFeature,
                        QgsGeometry,
                        QgsProject,
-                       QgsSettings,
                        QgsRasterLayer,
-                       QgsPoint,
                        QgsColorRampShader,
                        QgsRasterShader,
-                       QgsSingleBandPseudoColorRenderer,
-                       QgsSingleBandPseudoColorRenderer, QgsColorRampShader, QgsRasterShader, QgsProject
+                       QgsSingleBandPseudoColorRenderer, 
+                       QgsColorRampShader, 
+                       QgsRasterShader
                        )
 from qgis.PyQt.QtGui import QColor
-from qgis.core import (QgsColorRampShader, QgsRasterShader, QgsSingleBandPseudoColorRenderer)
 from qgis import processing
 
 from numpy import array
@@ -80,8 +73,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
     MI = 'MI'
     TYPE = 'TYPE'
     FRAME = 'FRAME'
-    CRS = 'CRS'
-    LOC = QgsApplication.locale()[:2]   
+    CRS = 'CRS' 
     SLOPE = 'SLOPE'
     MaxSlope = 'MaxSlope'
     MapaTematico = 'MapaTematico'
@@ -434,42 +426,21 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             feedback.pushInfo(f'Erro ao carregar o raster: {raster_layer.lastError().message()}')
         else:
             # Adiciona a camada raster ao projeto do QGIS
-            QgsProject.instance().addMapLayer(raster_layer)
-
-        # input_layer = QgsProject.instance().mapLayersByName(mde_name)[0]
-        
-        # slope_path = self.parameterAsFileOutput(parameters, self.SLOPE, context)
-        # # feedback.pushInfo(f'{slope_path}')
-
-        # # Calcular a declividade e criar a camada temporária em arquivo
-        # calculate_slope(input_layer, slope_path)
-
-        # # Carregar a camada de declividade no QGIS
-        # slope_layer = QgsRasterLayer(slope_path, 'Slope')
-        # QgsProject.instance().addMapLayer(slope_layer)    
+            QgsProject.instance().addMapLayer(raster_layer) 
 
         ############################################################ Descobrir Fuso UTM
 
         ponto_central = get_raster_center_point(dem_file)
-        # feedback.pushInfo(f'{type(ponto_central)}')
-        # feedback.pushInfo(f'{ponto_central}')
-        
+
         point_x = ponto_central.x()
         point_y = ponto_central.y()
-        # feedback.pushInfo(f'x:{point_x}; y:{point_y}')
         
-        # point = QgsPoint(longitude, latitude)
-        utm_zone = get_zone_number(ponto_central.y(), ponto_central.x())
-        # feedback.pushInfo(f'{type(utm_zone)}')
-        # feedback.pushInfo(f'{utm_zone}')
+        utm_zone = get_zone_number(point_y, point_x)
 
         if point_y <= 0:
             south_hemisphere = True
         else:
             south_hemisphere = False
-
-        # feedback.pushInfo(f'{utm_zone[0:2]}')
-        # feedback.pushInfo(f'{south_hemisphere}')
 
         crs = CRS.from_dict({'proj': 'utm', 'zone': utm_zone[0:2], 'south': south_hemisphere})
         epsg = crs.to_authority()
@@ -478,7 +449,6 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
 
         ############################################################ Reprojetar
         
-        # processing.run("gdal:warpreproject", {'INPUT':dem_file,'SOURCE_CRS':QgsCoordinateReferenceSystem('EPSG:4326'),'TARGET_CRS':QgsCoordinateReferenceSystem('EPSG:32731'),'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':30,'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,'TARGET_EXTENT_CRS':None,'MULTITHREADING':False,'EXTRA':'','OUTPUT':'TEMPORARY_OUTPUT'})
         reproj_dict = processing.run("gdal:warpreproject", {'INPUT':dem_file,'SOURCE_CRS':QgsCoordinateReferenceSystem('EPSG:4326'),'TARGET_CRS':QgsCoordinateReferenceSystem(f'EPSG:{epsg[1]}'),'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':30,'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,'TARGET_EXTENT_CRS':None,'MULTITHREADING':False,'EXTRA':'','OUTPUT':'TEMPORARY_OUTPUT'})
         feedback.pushInfo(f'{type(reproj_dict)}')
         feedback.pushInfo(f'{reproj_dict}')
