@@ -7,8 +7,8 @@ name=PFC2023
 qgisMinimumVersion=3.0
 description=Elaboração de mapas de trafegabilidade
 version=0.1
-author=1º TEN ARTHUR/1º TEN PIMENTEL/1º TEN VIANA
-email=arthur.santos@ime.eb.br
+author=Arthur Santos/Kaio Pimentel/Felipe VIANA
+email=arthur.santos@eb.mil.br/ kaio.pimentel@eb.mil.br/ felipe.silva@ime.eb.br
 
 about=Elaboração automatizada de mapas de trafegabilidade
 

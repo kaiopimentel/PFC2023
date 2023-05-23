@@ -2,13 +2,12 @@
 
 """
 /***************************************************************************
- PontoControle
+ Elaboração automatizada de mapas de trafegabilidade
                                  A QGIS plugin
- Ferramentas para a gerência de pontos de controle
+ 
                               -------------------
-        begin                : 2019-11-18
-        copyright            : (C) 2019 by 1CGEO/DSG
-        email                : eliton.filho@eb.mil.br
+        begin                : 2023-03-23
+        email                : arthur.santos@eb.mil.br/ kaio.pimentel@eb.mil.br/ felipe.silva@ime.eb.br
  ***************************************************************************/
 
 /***************************************************************************
@@ -21,9 +20,9 @@
  ***************************************************************************/
 """
 
-__author__ = '1CGEO/DSG'
-__date__ = '2019-11-18'
-__copyright__ = '(C) 2019 by 1CGEO/DSG'
+__author__ = 'Arthur Santos/ Kaio Pimentel/ Felipe Viana'
+__date__ = '2023-03-23'
+__copyright__ = ''
 
 # This will get replaced with a git SHA1 when you do a git archive
 
