@@ -33,6 +33,7 @@ from qgis.core import (QgsProcessing,
                        QgsGeometry,
                        QgsProject,
                        QgsRasterLayer,
+                       QgsVectorLayer,
                        QgsColorRampShader,
                        QgsRasterShader,
                        QgsSingleBandPseudoColorRenderer, 
@@ -502,5 +503,13 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
 
         QgsProject.instance().addMapLayer(thematic_raster)
 
+        source = "pagingEnabled='true' preferCoordinatesForWfsT11='false' restrictToRequestBBOX='1' srsname='EPSG:4326' typename='ms:Trecho_Massa_Dagua_A' url='https://bdgex.eb.mil.br/ms250' version='auto'"
+        camada_vetorial = QgsVectorLayer(source, "Trecho_Massa_Dagua_A", "WFS")
+        # Check if the layer is valid
+        if not camada_vetorial.isValid():
+            feedback.reportError("Layer failed to load!")
+        else:
+            # Add the layer to the map
+            QgsProject.instance().addMapLayer(camada_vetorial)
         return {}
         ###############################################################################################################################
