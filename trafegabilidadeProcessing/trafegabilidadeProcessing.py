@@ -14,7 +14,8 @@
 import os
 from osgeo import gdal
 from qgis.PyQt.QtCore import QCoreApplication, QVariant
-from qgis.core import (QgsProcessing,
+from qgis.core import (QgsRectangle,
+                       QgsProcessing,
                        QgsFeatureSink,
                        QgsProcessingException,
                        QgsProcessingAlgorithm,
@@ -509,7 +510,45 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         if not camada_vetorial.isValid():
             feedback.reportError("Layer failed to load!")
         else:
-            # Add the layer to the map
             QgsProject.instance().addMapLayer(camada_vetorial)
+            # Create a rectangle geometry from the extent
+            # Define the extent
+            extent = geom.boundingBox()
+            south = extent.yMinimum()
+            north = extent.yMaximum()
+            west = extent.xMinimum()
+            east = extent.xMaximum()
+
+            # Create a rectangle geometry from the extent
+            rect = QgsRectangle(west, south, east, north)
+            moldura_geom = QgsGeometry.fromRect(rect)
+
+            # Create a temporary vector layer for the frame
+            moldura = QgsVectorLayer("Polygon?crs=epsg:4326", "moldura", "memory")
+
+            # Add the frame geometry to the frame layer
+            prov = moldura.dataProvider()
+            feat = QgsFeature()
+            feat.setGeometry(moldura_geom)
+            prov.addFeature(feat)
+            moldura.updateExtents()
+
+            # Define the parameters for the clip algorithm
+            parameters = {
+                'INPUT': camada_vetorial,
+                'OVERLAY': moldura,
+                'OUTPUT': 'TEMPORARY_OUTPUT'
+            }
+
+            # Run the clip algorithm
+            result =  processing.run('native:clip', parameters, context=context, feedback=feedback)
+
+            # Get the clipped layer
+            clipped_layer = result['OUTPUT']
+
+            # Add the clipped layer to the map
+            QgsProject.instance().addMapLayer(clipped_layer)
+
         return {}
+        processing.run("native:clip", {'INPUT':'memory://MultiPolygon?crs=EPSG:4326&field=gid:string(0,0)&field=nome:string(0,0)&field=geometriaAproximada:string(0,0)&field=tipoMassaDagua:string(0,0)&field=regime:string(0,0)&field=salinidade:string(0,0)&field=nomeAbrev:string(0,0)&field=tipoTrechoMassa:string(0,0)&field=metadataid:string(0,0)&uid={28c7e85f-9fca-4b59-a14c-232a0c2496ec}','OVERLAY':'memory://MultiPolygon?crs=EPSG:4326&field=gid:string(0,0)&field=nome:string(0,0)&field=geometriaAproximada:string(0,0)&field=tipoMassaDagua:string(0,0)&field=regime:string(0,0)&field=salinidade:string(0,0)&field=nomeAbrev:string(0,0)&field=tipoTrechoMassa:string(0,0)&field=metadataid:string(0,0)&uid={28c7e85f-9fca-4b59-a14c-232a0c2496ec}','OUTPUT':'TEMPORARY_OUTPUT'})
         ###############################################################################################################################
