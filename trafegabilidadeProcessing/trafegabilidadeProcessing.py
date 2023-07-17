@@ -19,6 +19,7 @@ from qgis.core import (QgsRectangle,
                        QgsFeatureSink,
                        QgsProcessingException,
                        QgsProcessingAlgorithm,
+                       QgsProcessingUtils,
                        QgsProcessingParameterFeatureSource,
                        QgsProcessingParameterString,
                        QgsProcessingParameterFeatureSink,
@@ -511,43 +512,69 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             feedback.reportError("Layer failed to load!")
         else:
             QgsProject.instance().addMapLayer(camada_vetorial)
-            # Create a rectangle geometry from the extent
-            # Define the extent
-            extent = geom.boundingBox()
-            south = extent.yMinimum()
-            north = extent.yMaximum()
-            west = extent.xMinimum()
-            east = extent.xMaximum()
 
-            # Create a rectangle geometry from the extent
-            rect = QgsRectangle(west, south, east, north)
-            moldura_geom = QgsGeometry.fromRect(rect)
+        
+        
+        feedback.pushInfo(f'{type(sink)}')
+        
+        frame_layer = QgsProcessingUtils.mapLayerFromString(dest_id, context)
+        feats_count = frame_layer.featureCount()
+        feedback.pushInfo(f'{type(frame_layer)}, {frame_layer.extent()}, {feats_count}')
+        QgsProject.instance().addMapLayer(frame_layer)
 
-            # Create a temporary vector layer for the frame
-            moldura = QgsVectorLayer("Polygon?crs=epsg:4326", "moldura", "memory")
+        # clipped_layer = processing.run("native:clip", {'INPUT':camada_vetorial,'OVERLAY':frame_layer,'OUTPUT':QgsProcessing.TEMPORARY_OUTPUT})
+        # feedback.pushInfo(f'{type(clipped_layer)}, {clipped_layer}')
+        # clipped_layer = QgsVectorLayer(clipped_layer_path['OUTPUT'], f'Moldura_{nome}')
+        # QgsProject.instance().addMapLayer(clipped_layer)
+        
+        # clipped_layer = processing.run("native:clip", {'INPUT':"WFS://pagingEnabled='true' preferCoordinatesForWfsT11='false' restrictToRequestBBOX='1' srsname='EPSG:4326' typename='ms:Trecho_Massa_Dagua_A' url='https://bdgex.eb.mil.br/ms250' version='auto'",'OVERLAY':'memory://Polygon?crs=EPSG:4326&field=inom:string(0,0)&field=mi:string(0,0)&field=escala:integer(0,0)&uid={cc574cb8-2357-4542-a5fc-dbf8d5f31624}','OUTPUT':'TEMPORARY_OUTPUT'})['OUTPUT']
+        # QgsProject.instance().addMapLayer(clipped_layer)
 
-            # Add the frame geometry to the frame layer
-            prov = moldura.dataProvider()
-            feat = QgsFeature()
-            feat.setGeometry(moldura_geom)
-            prov.addFeature(feat)
-            moldura.updateExtents()
+        layers = QgsProject.instance().mapLayersByName('Moldura')
+        if layers:
+            feedback.pushInfo('success!')
+            feedback.pushInfo(f'{type(layers)}')
+            feedback.pushInfo(f'{type(layers[0])}')
+            feedback.pushInfo(f'{layers[0].featureCount()}')
+            frame_layer = layers[0]
+            feedback.pushInfo(f'{frame_layer.extent()}')
+        else:
+            feedback.pushInfo('erro :(')
+        
+        # clipped_layer = processing.run("native:clip", {'INPUT':camada_vetorial,'OVERLAY':frame_layer,'OUTPUT':'TEMPORARY_OUTPUT'})['OUTPUT']
+        # QgsProject.instance().addMapLayer(clipped_layer)
 
-            # Define the parameters for the clip algorithm
-            parameters = {
-                'INPUT': camada_vetorial,
-                'OVERLAY': moldura,
-                'OUTPUT': 'TEMPORARY_OUTPUT'
-            }
 
-            # Run the clip algorithm
-            result =  processing.run('native:clip', parameters, context=context, feedback=feedback)
+        # intersected_features = []
 
-            # Get the clipped layer
-            clipped_layer = result['OUTPUT']
+        # for feature1 in camada_vetorial.getFeatures():
+        #     for feature2 in frame_layer.getFeatures():
+        #         geometry1 = feature1.geometry()
+        #         geometry2 = feature2.geometry()
 
-            # Add the clipped layer to the map
-            QgsProject.instance().addMapLayer(clipped_layer)
+        #         if geometry1.intersects(geometry2):
+        #             intersection_geometry = geometry1.intersection(geometry2)
+
+        #             if not intersection_geometry.isEmpty():
+        #                 intersected_feature = QgsFeature()
+        #                 intersected_feature.setGeometry(intersection_geometry)
+        #                 intersected_feature.setAttributes(feature1.attributes())
+        #                 intersected_features.append(intersected_feature)
+
+        # intersection_layer = QgsVectorLayer("Polygon?crs={}".format(camada_vetorial.crs().authid()), "Intersection Layer", "memory")
+        # intersection_layer_data = intersection_layer.dataProvider()
+
+        # intersection_layer.startEditing()
+        # for feature in intersected_features:
+        #     intersection_layer.addFeature(feature)
+        # intersection_layer.commitChanges()
+
+        # QgsProject.instance().addMapLayer(intersection_layer)
+    
+        extraction_dict = processing.run("native:extractbyextent", {'INPUT':camada_vetorial,'EXTENT':frame_layer.extent(),'CLIP':True,'OUTPUT':'TEMPORARY_OUTPUT'})
+        feedback.pushInfo(f'{extraction_dict["OUTPUT"]}')
+        extraction_layer = extraction_dict["OUTPUT"]
+        QgsProject.instance().addMapLayer(extraction_layer)
 
         return {}
         processing.run("native:clip", {'INPUT':'memory://MultiPolygon?crs=EPSG:4326&field=gid:string(0,0)&field=nome:string(0,0)&field=geometriaAproximada:string(0,0)&field=tipoMassaDagua:string(0,0)&field=regime:string(0,0)&field=salinidade:string(0,0)&field=nomeAbrev:string(0,0)&field=tipoTrechoMassa:string(0,0)&field=metadataid:string(0,0)&uid={28c7e85f-9fca-4b59-a14c-232a0c2496ec}','OVERLAY':'memory://MultiPolygon?crs=EPSG:4326&field=gid:string(0,0)&field=nome:string(0,0)&field=geometriaAproximada:string(0,0)&field=tipoMassaDagua:string(0,0)&field=regime:string(0,0)&field=salinidade:string(0,0)&field=nomeAbrev:string(0,0)&field=tipoTrechoMassa:string(0,0)&field=metadataid:string(0,0)&uid={28c7e85f-9fca-4b59-a14c-232a0c2496ec}','OUTPUT':'TEMPORARY_OUTPUT'})
