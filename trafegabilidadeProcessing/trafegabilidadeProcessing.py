@@ -512,65 +512,9 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             feedback.reportError("Layer failed to load!")
         else:
             QgsProject.instance().addMapLayer(camada_vetorial)
-
         
-        
-        feedback.pushInfo(f'{type(sink)}')
         
         frame_layer = QgsProcessingUtils.mapLayerFromString(dest_id, context)
-        feats_count = frame_layer.featureCount()
-        feedback.pushInfo(f'{type(frame_layer)}, {frame_layer.extent()}, {feats_count}')
-        QgsProject.instance().addMapLayer(frame_layer)
-
-        # clipped_layer = processing.run("native:clip", {'INPUT':camada_vetorial,'OVERLAY':frame_layer,'OUTPUT':QgsProcessing.TEMPORARY_OUTPUT})
-        # feedback.pushInfo(f'{type(clipped_layer)}, {clipped_layer}')
-        # clipped_layer = QgsVectorLayer(clipped_layer_path['OUTPUT'], f'Moldura_{nome}')
-        # QgsProject.instance().addMapLayer(clipped_layer)
-        
-        # clipped_layer = processing.run("native:clip", {'INPUT':"WFS://pagingEnabled='true' preferCoordinatesForWfsT11='false' restrictToRequestBBOX='1' srsname='EPSG:4326' typename='ms:Trecho_Massa_Dagua_A' url='https://bdgex.eb.mil.br/ms250' version='auto'",'OVERLAY':'memory://Polygon?crs=EPSG:4326&field=inom:string(0,0)&field=mi:string(0,0)&field=escala:integer(0,0)&uid={cc574cb8-2357-4542-a5fc-dbf8d5f31624}','OUTPUT':'TEMPORARY_OUTPUT'})['OUTPUT']
-        # QgsProject.instance().addMapLayer(clipped_layer)
-
-        layers = QgsProject.instance().mapLayersByName('Moldura')
-        if layers:
-            feedback.pushInfo('success!')
-            feedback.pushInfo(f'{type(layers)}')
-            feedback.pushInfo(f'{type(layers[0])}')
-            feedback.pushInfo(f'{layers[0].featureCount()}')
-            frame_layer = layers[0]
-            feedback.pushInfo(f'{frame_layer.extent()}')
-        else:
-            feedback.pushInfo('erro :(')
-        
-        # clipped_layer = processing.run("native:clip", {'INPUT':camada_vetorial,'OVERLAY':frame_layer,'OUTPUT':'TEMPORARY_OUTPUT'})['OUTPUT']
-        # QgsProject.instance().addMapLayer(clipped_layer)
-
-
-        # intersected_features = []
-
-        # for feature1 in camada_vetorial.getFeatures():
-        #     for feature2 in frame_layer.getFeatures():
-        #         geometry1 = feature1.geometry()
-        #         geometry2 = feature2.geometry()
-
-        #         if geometry1.intersects(geometry2):
-        #             intersection_geometry = geometry1.intersection(geometry2)
-
-        #             if not intersection_geometry.isEmpty():
-        #                 intersected_feature = QgsFeature()
-        #                 intersected_feature.setGeometry(intersection_geometry)
-        #                 intersected_feature.setAttributes(feature1.attributes())
-        #                 intersected_features.append(intersected_feature)
-
-        # intersection_layer = QgsVectorLayer("Polygon?crs={}".format(camada_vetorial.crs().authid()), "Intersection Layer", "memory")
-        # intersection_layer_data = intersection_layer.dataProvider()
-
-        # intersection_layer.startEditing()
-        # for feature in intersected_features:
-        #     intersection_layer.addFeature(feature)
-        # intersection_layer.commitChanges()
-
-        # QgsProject.instance().addMapLayer(intersection_layer)
-    
         extraction_dict = processing.run("native:extractbyextent", {'INPUT':camada_vetorial,'EXTENT':frame_layer.extent(),'CLIP':True,'OUTPUT':'TEMPORARY_OUTPUT'})
         feedback.pushInfo(f'{extraction_dict["OUTPUT"]}')
         extraction_layer = extraction_dict["OUTPUT"]
