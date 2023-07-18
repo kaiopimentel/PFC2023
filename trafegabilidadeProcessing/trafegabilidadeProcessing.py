@@ -457,7 +457,6 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo(f'{reproj_dict}')
 
         reproj_path = reproj_dict['OUTPUT']
-        feedback.pushInfo(f'{reproj_dict["OUTPUT"]}')
         reproj_raster = QgsRasterLayer(reproj_path, f'REPROJ_{nome}')
         QgsProject.instance().addMapLayer(reproj_raster)
         ############################################################ Cálculo Declividade
@@ -513,7 +512,6 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         else:
             QgsProject.instance().addMapLayer(camada_vetorial)
         
-        
         frame_layer = QgsProcessingUtils.mapLayerFromString(dest_id, context)
         extraction_dict = processing.run("native:extractbyextent", {'INPUT':camada_vetorial,'EXTENT':frame_layer.extent(),'CLIP':True,'OUTPUT':'TEMPORARY_OUTPUT'})
         feedback.pushInfo(f'{extraction_dict["OUTPUT"]}')
@@ -521,5 +519,4 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         QgsProject.instance().addMapLayer(extraction_layer)
 
         return {}
-        processing.run("native:clip", {'INPUT':'memory://MultiPolygon?crs=EPSG:4326&field=gid:string(0,0)&field=nome:string(0,0)&field=geometriaAproximada:string(0,0)&field=tipoMassaDagua:string(0,0)&field=regime:string(0,0)&field=salinidade:string(0,0)&field=nomeAbrev:string(0,0)&field=tipoTrechoMassa:string(0,0)&field=metadataid:string(0,0)&uid={28c7e85f-9fca-4b59-a14c-232a0c2496ec}','OVERLAY':'memory://MultiPolygon?crs=EPSG:4326&field=gid:string(0,0)&field=nome:string(0,0)&field=geometriaAproximada:string(0,0)&field=tipoMassaDagua:string(0,0)&field=regime:string(0,0)&field=salinidade:string(0,0)&field=nomeAbrev:string(0,0)&field=tipoTrechoMassa:string(0,0)&field=metadataid:string(0,0)&uid={28c7e85f-9fca-4b59-a14c-232a0c2496ec}','OUTPUT':'TEMPORARY_OUTPUT'})
         ###############################################################################################################################
