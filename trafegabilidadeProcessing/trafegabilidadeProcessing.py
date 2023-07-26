@@ -25,6 +25,7 @@ from qgis.core import (QgsRectangle,
                        QgsProcessingParameterFeatureSink,
                        QgsProcessingParameterCrs,
                        QgsProcessingParameterRasterDestination,
+                       QgsProcessingParameterEnum,
                        QgsCoordinateReferenceSystem,
                        QgsCoordinateTransform,
                        QgsFields,
@@ -80,7 +81,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
     SLOPE = 'SLOPE'
     MaxSlope = 'MaxSlope'
     MapaTematico = 'MapaTematico'
-
+    SITUATION = 'SITUATION'
 
     def tr(self, string):
         """
@@ -151,12 +152,21 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
                 optional = True
             )
         )
-
+        
         self.addParameter(
             QgsProcessingParameterString(
                 self.MI,
                 self.tr('MI'),
             )
+        )
+
+        self.addParameter(
+            QgsProcessingParameterEnum(
+                self.SITUATION,
+                self.tr('Situação de deslocamento'),
+                ['Viatura sobre rodas', 'Viatura sobre lagartas', 'Deslocamento a pé']
+            )
+
         )
         self.addParameter(
             QgsProcessingParameterString(
@@ -225,6 +235,21 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             context
         )
 
+        situation = self.parameterAsNumber(
+            parameters,
+            self.SITUATION,
+            context
+        )
+
+        if situation == 0:
+            #vtr sobre rodas
+            situation_dict = {max_slope:17}
+        elif situation == 1:
+            #vtr sobre lagartas
+            situation_dict = {max_slope:26}
+        elif situation == 2:
+            #tropa a pé
+            situation_dict = {max_slope:30}
         ###############################################################################################################################
         # LFTools
         # Checking for geographic coordinate reference system
@@ -467,7 +492,8 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         QgsProject.instance().addMapLayer(slope_raster)
         
         ############################################################ Mapa Temático
-        max_slope = float(parameters[self.MaxSlope])
+        # max_slope = float(parameters[self.MaxSlope])
+        max_slope = slope_dict['max_slope']
         formula = f'(A < {max_slope}) * 1 + (A >= {max_slope}) * 0'
 
         thematic_dict = processing.run("gdal:rastercalculator", {
