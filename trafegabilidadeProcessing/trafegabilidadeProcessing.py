@@ -505,18 +505,48 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         QgsProject.instance().addMapLayer(thematic_raster)
 
         source = "pagingEnabled='true' preferCoordinatesForWfsT11='false' restrictToRequestBBOX='1' srsname='EPSG:4326' typename='ms:Trecho_Massa_Dagua_A' url='https://bdgex.eb.mil.br/ms250' version='auto'"
-        camada_vetorial = QgsVectorLayer(source, "Trecho_Massa_Dagua_A", "WFS")
+        vector_layer = QgsVectorLayer(source, "Trecho_Massa_Dagua_A", "WFS")
         # Check if the layer is valid
-        if not camada_vetorial.isValid():
+        if not vector_layer.isValid():
             feedback.reportError("Layer failed to load!")
         else:
-            QgsProject.instance().addMapLayer(camada_vetorial)
+            QgsProject.instance().addMapLayer(vector_layer)
         
         frame_layer = QgsProcessingUtils.mapLayerFromString(dest_id, context)
-        extraction_dict = processing.run("native:extractbyextent", {'INPUT':camada_vetorial,'EXTENT':frame_layer.extent(),'CLIP':True,'OUTPUT':'TEMPORARY_OUTPUT'})
-        feedback.pushInfo(f'{extraction_dict["OUTPUT"]}')
+        extraction_dict = processing.run("native:extractbyextent", {'INPUT':vector_layer,'EXTENT':frame_layer.extent(),'CLIP':True,'OUTPUT':'TEMPORARY_OUTPUT'})
         extraction_layer = extraction_dict["OUTPUT"]
         QgsProject.instance().addMapLayer(extraction_layer)
 
+        source_list = [
+            "pagingEnabled='true' preferCoordinatesForWfsT11='false' restrictToRequestBBOX='1' srsname='EPSG:4326' typename='ms:Area_Umida_A' url='https://bdgex.eb.mil.br/ms50' version='auto'",
+            "pagingEnabled='true' preferCoordinatesForWfsT11='false' restrictToRequestBBOX='1' srsname='EPSG:4326' typename='ms:Banco_Areia_A' url='https://bdgex.eb.mil.br/ms50' version='auto'",
+            "pagingEnabled='true' preferCoordinatesForWfsT11='false' restrictToRequestBBOX='1' srsname='EPSG:4326' typename='ms:Massa_Dagua_A' url='https://bdgex.eb.mil.br/ms50' version='auto'",
+            "pagingEnabled='true' preferCoordinatesForWfsT11='false' restrictToRequestBBOX='1' srsname='EPSG:4326' typename='ms:Recife_A' url='https://bdgex.eb.mil.br/ms50' version='auto'",
+            "pagingEnabled='true' preferCoordinatesForWfsT11='false' restrictToRequestBBOX='1' srsname='EPSG:4326' typename='ms:Rocha_Em_Agua_A' url='https://bdgex.eb.mil.br/ms50' version='auto'",
+            "pagingEnabled='true' preferCoordinatesForWfsT11='false' restrictToRequestBBOX='1' srsname='EPSG:4326' typename='ms:Terreno_Sujeito_Inundacao_A' url='https://bdgex.eb.mil.br/ms50' version='auto'"
+        ]
+        count = 1
+        for source in source_list:
+            vector_layer = QgsVectorLayer(source, f"camada_{count}", "WFS")
+            # Check if the layer is valid
+            if not vector_layer.isValid():
+                feedback.reportError("Layer failed to load!")
+            else:
+                QgsProject.instance().addMapLayer(vector_layer)
+                fields = vector_layer.dataProvider().fields()
+                fields_to_delete = []
+                for i in range(len(fields)):
+                    if i != 0:
+                        fields_to_delete.append(i)
+                feedback.pushInfo(f'{fields_to_delete}')
+                vector_layer.dataProvider().deleteAttributes(fields_to_delete)
+                vector_layer.updateFields()
+                vector_layer.commitChanges()
+                
+                frame_layer = QgsProcessingUtils.mapLayerFromString(dest_id, context)
+                extraction_dict = processing.run("native:extractbyextent", {'INPUT':vector_layer,'EXTENT':frame_layer.extent(),'CLIP':True,'OUTPUT':f'memory:extracted_{count}'})
+                extraction_layer = extraction_dict["OUTPUT"]
+                QgsProject.instance().addMapLayer(extraction_layer)
+            count+=1
         return {}
         ###############################################################################################################################
