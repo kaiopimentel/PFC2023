@@ -587,6 +587,9 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
 
         # Load the temporary GML file as a vector layer
         vector_layer = QgsVectorLayer(temp_file.name, "Trecho_Massa_Dagua_A", "ogr")
+        # Set the coordinate reference system to EPSG:4326
+        crs = QgsCoordinateReferenceSystem("EPSG:4326")
+        vector_layer.setCrs(crs)
 
         # Check if the vector layer is valid
         if not vector_layer.isValid():
