@@ -530,20 +530,22 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
 
         QgsProject.instance().addMapLayer(thematic_raster)
         import requests
-        from qgis.PyQt.QtCore import QUrl
-        from qgis.core import QgsVectorLayer, QgsProject, QgsProcessingUtils
         import tempfile
+        from qgis.PyQt.QtCore import QUrl
+        from qgis.core import QgsVectorLayer, QgsProject, QgsProcessingUtils, QgsMessageLog, Qgis
 
         # Get the extent of the frame layer
         frame_layer = QgsProcessingUtils.mapLayerFromString(dest_id, context)
 
         # Check if the frame_layer is valid
         if frame_layer is None:
+            QgsMessageLog.logMessage(f"No layer found with ID {dest_id}!", 'Mapa de Trafegabilidade', level=Qgis.Critical)
             raise ValueError(f"No layer found with ID {dest_id}!")
 
         # Check if the layer has a valid extent
         extent = frame_layer.extent()
         if extent is None or extent.isEmpty():
+            QgsMessageLog.logMessage(f"The layer with ID {dest_id} has no valid extent!", 'Mapa de Trafegabilidade', level=Qgis.Critical)
             raise ValueError(f"The layer with ID {dest_id} has no valid extent!")
 
         # Get the coordinates for the extent
@@ -562,33 +564,37 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             "typeName": "ms:Trecho_Massa_Dagua_A",
             "srsName": "EPSG:4326",
             "bbox": bbox,
-            "outputFormat": "GeoJSON",  # or "GML2"/"GML3" depending on the server
+            "outputFormat": "GML2",  # Changed to GML2
+            "version": "1.0.0",  # Added version parameter
         }
         wfs_url = "https://bdgex.eb.mil.br/ms250"
         response = requests.get(wfs_url, params=params)
+        print(response.content)
 
         # Check if the request was successful
-        response.raise_for_status()
+        if response.status_code != 200:
+            QgsMessageLog.logMessage(f"Request failed with status code: {response.status_code}", 'Mapa de Trafegabilidade', level=Qgis.Critical)
+            raise ValueError(f"Request failed with status code: {response.status_code}")
 
         # Create a temporary file
-        temp_file = tempfile.NamedTemporaryFile(suffix=".geojson", delete=False)
+        temp_file = tempfile.NamedTemporaryFile(suffix=".gml", delete=False)
+        QgsMessageLog.logMessage("Temporary file created at:" + temp_file.name, 'Mapa de Trafegabilidade', level=Qgis.Info)
         temp_file.close()
 
-        # Write the response to a temporary GeoJSON file
+        # Write the response to a temporary GML file
         with open(temp_file.name, "w") as f:
             f.write(response.text)
 
-        # Load the temporary GeoJSON file as a vector layer
+        # Load the temporary GML file as a vector layer
         vector_layer = QgsVectorLayer(temp_file.name, "Trecho_Massa_Dagua_A", "ogr")
 
         # Check if the vector layer is valid
         if not vector_layer.isValid():
+            QgsMessageLog.logMessage(vector_layer.error().message(), 'Mapa de Trafegabilidade', level=Qgis.Critical)  # DEBUG: print the error message
             raise ValueError("Vector layer failed to load!")
 
         # Add the vector layer to the project
         QgsProject.instance().addMapLayer(vector_layer)
 
-        # Delete the temporary file
-        os.remove(temp_file.name)
         return {}
         ###############################################################################################################################
