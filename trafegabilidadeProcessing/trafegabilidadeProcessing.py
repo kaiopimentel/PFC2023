@@ -164,7 +164,8 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             QgsProcessingParameterEnum(
                 self.SITUATION,
                 self.tr('Situação de deslocamento'),
-                ['Viatura sobre rodas', 'Viatura sobre lagartas', 'Deslocamento a pé']
+                ['Viatura sobre rodas', 'Viatura sobre lagartas', 'Deslocamento a pé'],
+                defaultValue = 0
             )
 
         )
