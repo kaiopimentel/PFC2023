@@ -598,6 +598,10 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
 
         # Add the vector layer to the project
         QgsProject.instance().addMapLayer(vector_layer)
+        frame_layer = QgsProcessingUtils.mapLayerFromString(dest_id, context)
+        extraction_dict = processing.run("native:extractbyextent", {'INPUT':vector_layer,'EXTENT':frame_layer.extent(),'CLIP':True,'OUTPUT':'TEMPORARY_OUTPUT'})
+        extraction_layer = extraction_dict["OUTPUT"]
+        QgsProject.instance().addMapLayer(extraction_layer)
 
         return {}
         ###############################################################################################################################
