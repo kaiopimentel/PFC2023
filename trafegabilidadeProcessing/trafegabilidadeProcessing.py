@@ -222,7 +222,8 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         # Retrieve the feature source and sink. The 'dest_id' variable is used
         # to uniquely identify the feature sink, and must be included in the
         # dictionary returned by the processAlgorithm function.
-        
+        from qgis.core import QgsProject
+
         nome = self.parameterAsString(
             parameters,
             self.MI,
@@ -235,7 +236,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             context
         )
 
-        situation = self.parameterAsNumber(
+        situation = self.parameterAsInt(
             parameters,
             self.SITUATION,
             context
@@ -243,13 +244,13 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
 
         if situation == 0:
             #vtr sobre rodas
-            situation_dict = {max_slope:17}
+            max_slope=17
         elif situation == 1:
             #vtr sobre lagartas
-            situation_dict = {max_slope:26}
+            max_slope=26
         elif situation == 2:
             #tropa a pé
-            situation_dict = {max_slope:30}
+            max_slope=30
         ###############################################################################################################################
         # LFTools
         # Checking for geographic coordinate reference system
@@ -493,7 +494,6 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         
         ############################################################ Mapa Temático
         # max_slope = float(parameters[self.MaxSlope])
-        max_slope = slope_dict['max_slope']
         formula = f'(A < {max_slope}) * 1 + (A >= {max_slope}) * 0'
 
         thematic_dict = processing.run("gdal:rastercalculator", {
@@ -529,50 +529,66 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         thematic_raster.setRenderer(renderer)
 
         QgsProject.instance().addMapLayer(thematic_raster)
+        import requests
+        from qgis.PyQt.QtCore import QUrl
+        from qgis.core import QgsVectorLayer, QgsProject, QgsProcessingUtils
+        import tempfile
 
-        source = "pagingEnabled='true' preferCoordinatesForWfsT11='false' restrictToRequestBBOX='1' srsname='EPSG:4326' typename='ms:Trecho_Massa_Dagua_A' url='https://bdgex.eb.mil.br/ms250' version='auto'"
-        vector_layer = QgsVectorLayer(source, "Trecho_Massa_Dagua_A", "WFS")
-        # Check if the layer is valid
-        if not vector_layer.isValid():
-            feedback.reportError("Layer failed to load!")
-        else:
-            QgsProject.instance().addMapLayer(vector_layer)
-        
+        # Get the extent of the frame layer
         frame_layer = QgsProcessingUtils.mapLayerFromString(dest_id, context)
-        extraction_dict = processing.run("native:extractbyextent", {'INPUT':vector_layer,'EXTENT':frame_layer.extent(),'CLIP':True,'OUTPUT':'TEMPORARY_OUTPUT'})
-        extraction_layer = extraction_dict["OUTPUT"]
-        QgsProject.instance().addMapLayer(extraction_layer)
 
-        source_list = [
-            "pagingEnabled='true' preferCoordinatesForWfsT11='false' restrictToRequestBBOX='1' srsname='EPSG:4326' typename='ms:Area_Umida_A' url='https://bdgex.eb.mil.br/ms50' version='auto'",
-            "pagingEnabled='true' preferCoordinatesForWfsT11='false' restrictToRequestBBOX='1' srsname='EPSG:4326' typename='ms:Banco_Areia_A' url='https://bdgex.eb.mil.br/ms50' version='auto'",
-            "pagingEnabled='true' preferCoordinatesForWfsT11='false' restrictToRequestBBOX='1' srsname='EPSG:4326' typename='ms:Massa_Dagua_A' url='https://bdgex.eb.mil.br/ms50' version='auto'",
-            "pagingEnabled='true' preferCoordinatesForWfsT11='false' restrictToRequestBBOX='1' srsname='EPSG:4326' typename='ms:Recife_A' url='https://bdgex.eb.mil.br/ms50' version='auto'",
-            "pagingEnabled='true' preferCoordinatesForWfsT11='false' restrictToRequestBBOX='1' srsname='EPSG:4326' typename='ms:Rocha_Em_Agua_A' url='https://bdgex.eb.mil.br/ms50' version='auto'",
-            "pagingEnabled='true' preferCoordinatesForWfsT11='false' restrictToRequestBBOX='1' srsname='EPSG:4326' typename='ms:Terreno_Sujeito_Inundacao_A' url='https://bdgex.eb.mil.br/ms50' version='auto'"
-        ]
-        count = 1
-        for source in source_list:
-            vector_layer = QgsVectorLayer(source, f"camada_{count}", "WFS")
-            # Check if the layer is valid
-            if not vector_layer.isValid():
-                feedback.reportError("Layer failed to load!")
-            else:
-                QgsProject.instance().addMapLayer(vector_layer)
-                fields = vector_layer.dataProvider().fields()
-                fields_to_delete = []
-                for i in range(len(fields)):
-                    if i != 0:
-                        fields_to_delete.append(i)
-                feedback.pushInfo(f'{fields_to_delete}')
-                vector_layer.dataProvider().deleteAttributes(fields_to_delete)
-                vector_layer.updateFields()
-                vector_layer.commitChanges()
-                
-                frame_layer = QgsProcessingUtils.mapLayerFromString(dest_id, context)
-                extraction_dict = processing.run("native:extractbyextent", {'INPUT':vector_layer,'EXTENT':frame_layer.extent(),'CLIP':True,'OUTPUT':f'memory:extracted_{count}'})
-                extraction_layer = extraction_dict["OUTPUT"]
-                QgsProject.instance().addMapLayer(extraction_layer)
-            count+=1
+        # Check if the frame_layer is valid
+        if frame_layer is None:
+            raise ValueError(f"No layer found with ID {dest_id}!")
+
+        # Check if the layer has a valid extent
+        extent = frame_layer.extent()
+        if extent is None or extent.isEmpty():
+            raise ValueError(f"The layer with ID {dest_id} has no valid extent!")
+
+        # Get the coordinates for the extent
+        south = extent.yMinimum()
+        north = extent.yMaximum()
+        west = extent.xMinimum()
+        east = extent.xMaximum()
+
+        # Define the bbox string
+        bbox = f"{west},{south},{east},{north}"
+
+        # Build WFS request URL
+        params = {
+            "service": "WFS",
+            "request": "GetFeature",
+            "typeName": "ms:Trecho_Massa_Dagua_A",
+            "srsName": "EPSG:4326",
+            "bbox": bbox,
+            "outputFormat": "GeoJSON",  # or "GML2"/"GML3" depending on the server
+        }
+        wfs_url = "https://bdgex.eb.mil.br/ms250"
+        response = requests.get(wfs_url, params=params)
+
+        # Check if the request was successful
+        response.raise_for_status()
+
+        # Create a temporary file
+        temp_file = tempfile.NamedTemporaryFile(suffix=".geojson", delete=False)
+        temp_file.close()
+
+        # Write the response to a temporary GeoJSON file
+        with open(temp_file.name, "w") as f:
+            f.write(response.text)
+
+        # Load the temporary GeoJSON file as a vector layer
+        vector_layer = QgsVectorLayer(temp_file.name, "Trecho_Massa_Dagua_A", "ogr")
+
+        # Check if the vector layer is valid
+        if not vector_layer.isValid():
+            raise ValueError("Vector layer failed to load!")
+
+        # Add the vector layer to the project
+        QgsProject.instance().addMapLayer(vector_layer)
+
+        # Delete the temporary file
+        os.remove(temp_file.name)
         return {}
         ###############################################################################################################################
