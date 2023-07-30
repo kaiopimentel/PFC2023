@@ -533,6 +533,11 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         import tempfile
         from qgis.PyQt.QtCore import QUrl
         from qgis.core import QgsVectorLayer, QgsProject, QgsProcessingUtils, QgsMessageLog, Qgis
+        from qgis.analysis import QgsNativeAlgorithms
+        from qgis.core import QgsApplication, QgsProcessingFeatureSourceDefinition
+
+        # Register the native algorithms for processing.
+        QgsApplication.processingRegistry().addProvider(QgsNativeAlgorithms())
 
         # Get the extent of the frame layer
         frame_layer = QgsProcessingUtils.mapLayerFromString(dest_id, context)
@@ -564,12 +569,11 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             "typeName": "ms:Trecho_Massa_Dagua_A",
             "srsName": "EPSG:4326",
             "bbox": bbox,
-            "outputFormat": "GML2",  # Changed to GML2
-            "version": "1.0.0",  # Added version parameter
+            "outputFormat": "GML2",
+            "version": "1.0.0",
         }
         wfs_url = "https://bdgex.eb.mil.br/ms250"
         response = requests.get(wfs_url, params=params)
-        print(response.content)
 
         # Check if the request was successful
         if response.status_code != 200:
@@ -579,29 +583,36 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         # Create a temporary file
         temp_file = tempfile.NamedTemporaryFile(suffix=".gml", delete=False)
         QgsMessageLog.logMessage("Temporary file created at:" + temp_file.name, 'Mapa de Trafegabilidade', level=Qgis.Info)
-        temp_file.close()
 
         # Write the response to a temporary GML file
         with open(temp_file.name, "w") as f:
             f.write(response.text)
+        temp_file.close()
 
         # Load the temporary GML file as a vector layer
         vector_layer = QgsVectorLayer(temp_file.name, "Trecho_Massa_Dagua_A", "ogr")
+
         # Set the coordinate reference system to EPSG:4326
         crs = QgsCoordinateReferenceSystem("EPSG:4326")
         vector_layer.setCrs(crs)
 
         # Check if the vector layer is valid
         if not vector_layer.isValid():
-            QgsMessageLog.logMessage(vector_layer.error().message(), 'Mapa de Trafegabilidade', level=Qgis.Critical)  # DEBUG: print the error message
+            QgsMessageLog.logMessage(vector_layer.error().message(), 'Mapa de Trafegabilidade', level=Qgis.Critical)
             raise ValueError("Vector layer failed to load!")
 
-        # Add the vector layer to the project
-        QgsProject.instance().addMapLayer(vector_layer)
-        frame_layer = QgsProcessingUtils.mapLayerFromString(dest_id, context)
-        extraction_dict = processing.run("native:extractbyextent", {'INPUT':vector_layer,'EXTENT':frame_layer.extent(),'CLIP':True,'OUTPUT':'TEMPORARY_OUTPUT'})
-        extraction_layer = extraction_dict["OUTPUT"]
-        QgsProject.instance().addMapLayer(extraction_layer)
+        # Perform clipping operation
+        params = {
+            'INPUT': vector_layer,
+            'OVERLAY': frame_layer,
+            'OUTPUT': 'memory:'  # store output in memory
+        }
+        clip_result = processing.run("native:clip", params)
 
+        # Get the clipped layer
+        clipped_layer = clip_result['OUTPUT']
+
+        # Add the clipped layer to the project
+        QgsProject.instance().addMapLayer(clipped_layer)
         return {}
         ###############################################################################################################################
