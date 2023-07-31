@@ -55,6 +55,8 @@ from .calculo_declividade import calculate_slope
 from .get_central_coord import get_raster_center_point
 from .get_utm_zone import get_zone_number
 
+from .classList import class_list
+
 class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
     """
     This is an example algorithm that takes a vector layer and
@@ -563,57 +565,62 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         # Define the bbox string
         bbox = f"{west},{south},{east},{north}"
 
-        # Build WFS request URL
-        params = {
-            "service": "WFS",
-            "request": "GetFeature",
-            "typeName": "ms:Trecho_Massa_Dagua_A",
-            "srsName": "EPSG:4326",
-            "bbox": bbox,
-            "outputFormat": "GML2",
-            "version": "1.0.0",
-        }
-        wfs_url = "https://bdgex.eb.mil.br/ms250"
-        response = requests.get(wfs_url, params=params)
+        for category in class_list:
+            for classe in category:
+                # Build WFS request URL
+                params = {
+                    "service": "WFS",
+                    "request": "GetFeature",
+                    "typeName": "ms:"+classe,
+                    "srsName": "EPSG:4326",
+                    "bbox": bbox,
+                    "outputFormat": "GML2",
+                    "version": "1.0.0",
+                }
+                wfs_url = "https://bdgex.eb.mil.br/ms250"
+                response = requests.get(wfs_url, params=params)
 
-        # Check if the request was successful
-        if response.status_code != 200:
-            QgsMessageLog.logMessage(f"Request failed with status code: {response.status_code}", 'Mapa de Trafegabilidade', level=Qgis.Critical)
-            raise ValueError(f"Request failed with status code: {response.status_code}")
+                # Check if the request was successful
+                if response.status_code != 200:
+                    QgsMessageLog.logMessage(f"Request failed with status code: {response.status_code}", 'Mapa de Trafegabilidade', level=Qgis.Critical)
+                    raise ValueError(f"Request failed with status code: {response.status_code}")
 
-        # Create a temporary file
-        temp_file = tempfile.NamedTemporaryFile(suffix=".gml", delete=False)
-        QgsMessageLog.logMessage("Temporary file created at:" + temp_file.name, 'Mapa de Trafegabilidade', level=Qgis.Info)
+                # Create a temporary file
+                temp_file = tempfile.NamedTemporaryFile(suffix=".gml", delete=False)
+                QgsMessageLog.logMessage("Temporary file created at:" + temp_file.name, 'Mapa de Trafegabilidade', level=Qgis.Info)
 
-        # Write the response to a temporary GML file
-        with open(temp_file.name, "w") as f:
-            f.write(response.text)
-        temp_file.close()
+                # Write the response to a temporary GML file
+                with open(temp_file.name, "w") as f:
+                    f.write(response.text)
+                temp_file.close()
 
-        # Load the temporary GML file as a vector layer
-        vector_layer = QgsVectorLayer(temp_file.name, "Trecho_Massa_Dagua_A", "ogr")
+                # Load the temporary GML file as a vector layer
+                vector_layer = QgsVectorLayer(temp_file.name, classe, "ogr")
 
-        # Set the coordinate reference system to EPSG:4326
-        crs = QgsCoordinateReferenceSystem("EPSG:4326")
-        vector_layer.setCrs(crs)
+                # Set the coordinate reference system to EPSG:4326
+                crs = QgsCoordinateReferenceSystem("EPSG:4326")
+                vector_layer.setCrs(crs)
 
-        # Check if the vector layer is valid
-        if not vector_layer.isValid():
-            QgsMessageLog.logMessage(vector_layer.error().message(), 'Mapa de Trafegabilidade', level=Qgis.Critical)
-            raise ValueError("Vector layer failed to load!")
+                # Check if the vector layer is valid
+                feedback.pushInfo(f'{classe}')
+                if not vector_layer.isValid():
+                    QgsMessageLog.logMessage(vector_layer.error().message(), 'Mapa de Trafegabilidade', level=Qgis.Critical)
+                    raise ValueError("Vector layer failed to load!")
 
-        # Perform clipping operation
-        params = {
-            'INPUT': vector_layer,
-            'OVERLAY': frame_layer,
-            'OUTPUT': 'memory:'  # store output in memory
-        }
-        clip_result = processing.run("native:clip", params)
+                # Perform clipping operation
+                params = {
+                    'INPUT': vector_layer,
+                    'OVERLAY': frame_layer,
+                    'OUTPUT': 'memory:'  # store output in memory
+                }
+                clip_result = processing.run("native:clip", params)
 
-        # Get the clipped layer
-        clipped_layer = clip_result['OUTPUT']
+                # Get the clipped layer
+                clipped_layer = clip_result['OUTPUT']
 
-        # Add the clipped layer to the project
-        QgsProject.instance().addMapLayer(clipped_layer)
+                # Add the clipped layer to the project
+                QgsProject.instance().addMapLayer(clipped_layer)
+                clipped_layer.setName(classe+'_output')
+
         return {}
         ###############################################################################################################################
