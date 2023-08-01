@@ -566,7 +566,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         bbox = f"{west},{south},{east},{north}"
 
         for category in class_list:
-            for classe in category:
+            for classe in category['classes']:
                 # Build WFS request URL
                 params = {
                     "service": "WFS",
@@ -620,7 +620,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
 
                 # Add the clipped layer to the project
                 QgsProject.instance().addMapLayer(clipped_layer)
-                clipped_layer.setName(classe+'_output')
+                clipped_layer.setName(category['type']+'_'+classe+'_output')
                 
 
         return {}
