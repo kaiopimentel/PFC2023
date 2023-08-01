@@ -621,6 +621,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
                 # Add the clipped layer to the project
                 QgsProject.instance().addMapLayer(clipped_layer)
                 clipped_layer.setName(classe+'_output')
+                
 
         return {}
         ###############################################################################################################################
