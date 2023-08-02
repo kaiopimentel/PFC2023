@@ -37,6 +37,7 @@ from qgis.core import (QgsRectangle,
                        QgsProject,
                        QgsRasterLayer,
                        QgsVectorLayer,
+                       QgsMapLayer,
                        QgsColorRampShader,
                        QgsRasterShader,
                        QgsSingleBandPseudoColorRenderer, 
@@ -532,6 +533,19 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         thematic_raster.setRenderer(renderer)
 
         QgsProject.instance().addMapLayer(thematic_raster)
+        
+        from qgis.core import QgsVectorLayer
+
+        vectorized_dict = processing.run("gdal:polygonize", {'INPUT':thematic_raster_path,'BAND':1,'FIELD':'DN','EIGHT_CONNECTEDNESS':True,'EXTRA':'','OUTPUT':'TEMPORARY_OUTPUT'})  
+        feedback.pushInfo(f'{vectorized_dict}')
+        feedback.pushInfo(f'{type(vectorized_dict)}')
+        vectorized_layer_path = vectorized_dict['OUTPUT']
+        feedback.pushInfo(f'{vectorized_layer_path}')
+        feedback.pushInfo(f'{type(vectorized_layer_path)}')
+        vectorized_layer = QgsVectorLayer(vectorized_layer_path, 'vectorized')
+        
+        QgsProject.instance().addMapLayer(vectorized_layer)
+
         import requests
         import tempfile
         from qgis.PyQt.QtCore import QUrl

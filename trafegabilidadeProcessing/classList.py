@@ -30,6 +30,14 @@ class_list = [
             "Veg_Cultivada_A"
             ]
 
+    },
+    #outros
+    {
+    'type':'out',
+    'classes':[
+            "Terra_Indigena_A"
+            ]
+
     }
 
 ]
