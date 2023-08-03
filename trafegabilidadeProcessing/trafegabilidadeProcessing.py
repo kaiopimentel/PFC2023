@@ -636,6 +636,16 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
                 QgsProject.instance().addMapLayer(clipped_layer)
                 clipped_layer.setName(category['type']+'_'+classe+'_output')
                 
+                feedback.pushInfo(f'{type(clipped_layer.renderer())}')
+                if not f'{type(clipped_layer.renderer())}' == "<class 'NoneType'>":
+                    symbol = clipped_layer.renderer().symbol()
+                    if category['type'] == 'veg':
+                        symbol.setColor(QColor.fromRgb(50,200,50))
+                    elif category['type'] == 'hid':
+                        symbol.setColor(QColor.fromRgb(50,50,200))
+                    elif category['type'] == 'out':
+                        symbol.setColor(QColor.fromRgb(30,30,30))   
 
+                
         return {}
         ###############################################################################################################################
