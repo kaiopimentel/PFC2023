@@ -481,8 +481,30 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         # feedback.pushInfo(f'{epsg[1]}')
 
         ############################################################ Reprojetar
-        
-        reproj_dict = processing.run("gdal:warpreproject", {'INPUT':dem_file,'SOURCE_CRS':QgsCoordinateReferenceSystem('EPSG:4326'),'TARGET_CRS':QgsCoordinateReferenceSystem(f'EPSG:{epsg[1]}'),'RESAMPLING':0,'NODATA':None,'TARGET_RESOLUTION':30,'OPTIONS':'','DATA_TYPE':0,'TARGET_EXTENT':None,'TARGET_EXTENT_CRS':None,'MULTITHREADING':False,'EXTRA':'','OUTPUT':'TEMPORARY_OUTPUT'})
+        import tempfile
+
+        # Criar um arquivo temporário para o reprojeção
+        reproj_fd, reproj_path = tempfile.mkstemp(suffix='.tif')
+        os.close(reproj_fd)  # Fechar o descritor de arquivo, já que só precisamos do caminho
+
+        # Reprojeção
+        reproj_dict = processing.run("gdal:warpreproject", {'INPUT': dem_file, 'SOURCE_CRS': QgsCoordinateReferenceSystem('EPSG:4326'), 'TARGET_CRS': QgsCoordinateReferenceSystem(f'EPSG:{epsg[1]}'), 'RESAMPLING': 0, 'NODATA': None, 'TARGET_RESOLUTION': 30, 'OPTIONS': '', 'DATA_TYPE': 0, 'TARGET_EXTENT': None, 'TARGET_EXTENT_CRS': None, 'MULTITHREADING': False, 'EXTRA': '', 'OUTPUT': reproj_path})
+
+        # Criar um arquivo temporário para a declividade
+        slope_fd, slope_path = tempfile.mkstemp(suffix='.tif')
+        os.close(slope_fd)
+
+        # Cálculo de Declividade
+        slope_dict = processing.run("native:slope", {'INPUT': reproj_path, 'Z_FACTOR': 1, 'OUTPUT': slope_path})
+
+        # Criar um arquivo temporário para o mapa temático
+        thematic_fd, thematic_raster_path = tempfile.mkstemp(suffix='.tif')
+        os.close(thematic_fd)
+
+        # Mapa Temático
+        formula = f'(A < {max_slope}) * 1 + (A >= {max_slope}) * 0'
+        thematic_dict = processing.run("gdal:rastercalculator", {'INPUT_A': slope_path, 'BAND_A': 1, 'INPUT_B': None, 'BAND_B': -1, 'INPUT_C': None, 'BAND_C': -1, 'INPUT_D': None, 'BAND_D': -1, 'INPUT_E': None, 'BAND_E': -1, 'INPUT_F': None, 'BAND_F': -1, 'FORMULA': formula, 'NO_DATA': None, 'RTYPE': 5, 'OPTIONS': '', 'EXTRA': '', 'OUTPUT': thematic_raster_path})
+
         feedback.pushInfo(f'{type(reproj_dict)}')
         feedback.pushInfo(f'{reproj_dict}')
 
@@ -491,7 +513,6 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         QgsProject.instance().addMapLayer(reproj_raster)
         ############################################################ Cálculo Declividade
         
-        slope_dict = processing.run("native:slope", {'INPUT':reproj_path,'Z_FACTOR':1,'OUTPUT':'TEMPORARY_OUTPUT'})
         slope_path = slope_dict['OUTPUT']
         slope_raster = QgsRasterLayer(slope_path, f'SLOPE_{nome}')
         QgsProject.instance().addMapLayer(slope_raster)
@@ -499,21 +520,6 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         ############################################################ Mapa Temático
         # max_slope = float(parameters[self.MaxSlope])
         formula = f'(A < {max_slope}) * 1 + (A >= {max_slope}) * 0'
-
-        thematic_dict = processing.run("gdal:rastercalculator", {
-            'INPUT_A': slope_path, 'BAND_A': 1,
-            'INPUT_B': None, 'BAND_B': -1,
-            'INPUT_C': None, 'BAND_C': -1,
-            'INPUT_D': None, 'BAND_D': -1,
-            'INPUT_E': None, 'BAND_E': -1,
-            'INPUT_F': None, 'BAND_F': -1,
-            'FORMULA': formula,
-            'NO_DATA': None,
-            'RTYPE': 5,
-            'OPTIONS': '',
-            'EXTRA': '',
-            'OUTPUT': parameters[self.MapaTematico]
-        })
 
         thematic_raster_path = thematic_dict['OUTPUT']
 
