@@ -20,7 +20,7 @@ class_list = [
     'classes':[
             "Brejo_Pantano_A",
             "Caatinga_A",
-            "Campinarana_A",
+        #     "Campinarana_A",
             "Campo_A",
             "Cerrado_Cerradao_A",
             "Floresta_A",

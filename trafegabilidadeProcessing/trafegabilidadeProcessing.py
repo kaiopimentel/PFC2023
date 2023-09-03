@@ -585,6 +585,8 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         # Define the bbox string
         bbox = f"{west},{south},{east},{north}"
 
+        noinfo_classes = []
+        empty = True
         for category in class_list:
             for classe in category['classes']:
                 # Build WFS request URL
@@ -597,7 +599,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
                     "outputFormat": "GML2",
                     "version": "1.0.0",
                 }
-                wfs_url = "https://bdgex.eb.mil.br/ms250"
+                wfs_url = "https://bdgex.eb.mil.br/ms25"
                 response = requests.get(wfs_url, params=params)
 
                 # Check if the request was successful
@@ -622,7 +624,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
                 vector_layer.setCrs(crs)
 
                 # Check if the vector layer is valid
-                feedback.pushInfo(f'{classe}')
+                # feedback.pushInfo(f'{classe}')
                 if not vector_layer.isValid():
                     QgsMessageLog.logMessage(vector_layer.error().message(), 'Mapa de Trafegabilidade', level=Qgis.Critical)
                     raise ValueError("Vector layer failed to load!")
@@ -637,12 +639,18 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
 
                 # Get the clipped layer
                 clipped_layer = clip_result['OUTPUT']
-
-                # Add the clipped layer to the project
-                QgsProject.instance().addMapLayer(clipped_layer)
-                clipped_layer.setName(category['type']+'_'+classe+'_output')
                 
-                feedback.pushInfo(f'{type(clipped_layer.renderer())}')
+                # Add the clipped layer to the project
+                string_to_find = "<gml:null>missing</gml:null>"
+                if string_to_find in response.text:
+                    noinfo_classes.append(category['type']+'_'+classe)
+                elif clipped_layer.featureCount() > 0:
+                    QgsProject.instance().addMapLayer(clipped_layer)
+                    clipped_layer.setName(category['type']+'_'+classe+'_output')
+                    empty = False
+                else:
+                    noinfo_classes.append(category['type']+'_'+classe)
+
                 if not f'{type(clipped_layer.renderer())}' == "<class 'NoneType'>":
                     symbol = clipped_layer.renderer().symbol()
                     if category['type'] == 'veg':
@@ -652,6 +660,10 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
                     elif category['type'] == 'out':
                         symbol.setColor(QColor.fromRgb(30,30,30))   
 
-                
+        if empty == True:
+            feedback.pushInfo('Sem vetores para esse MI')
+        else:
+            for classe in noinfo_classes:
+                feedback.pushInfo(f"{category['type']+'_'+classe} não encontrado para este MI")
         return {}
         ###############################################################################################################################
