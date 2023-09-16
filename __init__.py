@@ -21,7 +21,8 @@ Elaboração automatizada de mapas de trafegabilidade
  ***************************************************************************/
  This script initializes the plugin, making it known to QGIS.
 """
-
+import os
+os.environ['PYTHONDONTWRITEBYTECODE'] = '1'
 __author__ = 'Arthur Santos/ Kaio Pimentel/ Felipe Viana'
 __date__ = '2023-03-23'
 __copyright__ = ''

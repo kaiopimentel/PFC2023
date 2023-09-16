@@ -10,8 +10,10 @@
 *                                                                         *
 ***************************************************************************
 """
-
+import sys
+sys.dont_write_bytecode = True
 import os
+import shutil
 from osgeo import gdal
 from qgis.PyQt.QtCore import QCoreApplication, QVariant
 from qgis.core import (QgsRectangle,
@@ -71,7 +73,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
     All Processing algorithms should extend the QgsProcessingAlgorithm
     class.
     """
-
+    
     # Constants used to refer to parameters and outputs. They will be
     # used when calling the algorithm from another algorithm, or when
     # calling from the QGIS console.
@@ -138,13 +140,18 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         return self.tr('''
         Este plugin utiliza-se de parâmetros fornecidos pelo usuário para elaboração de mapas de trafegabilidade de maneira automatizada
         ''')
+    
+    def __init__(self):
+        super().__init__()
+        # Limpe o cache ao iniciar o algoritmo
+        self.clear_pycache(os.path.dirname(__file__))
 
     def initAlgorithm(self, config=None):
         """
         Here we define the inputs and output of the algorithm, along
         with some other properties.
         """
-
+        
         # We add the input vector features source. It can have any kind of
         # geometry.
         self.addParameter(
@@ -248,13 +255,16 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
 
         if situation == 0:
             #vtr sobre rodas
-            max_slope=17
+            restrictive_slope = 6
+            impediment_slope=17
         elif situation == 1:
             #vtr sobre lagartas
-            max_slope=26
+            restrictive_slope = 17
+            impediment_slope=26
         elif situation == 2:
             #tropa a pé
-            max_slope=30
+            restrictive_slope = 26
+            impediment_slope=45
         ###############################################################################################################################
         # LFTools
         # Checking for geographic coordinate reference system
@@ -502,7 +512,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         os.close(thematic_fd)
 
         # Mapa Temático
-        formula = f'(A < {max_slope}) * 1 + (A >= {max_slope}) * 0'
+        formula = f'(A < {impediment_slope}) * 1 + (A >= {impediment_slope}) * 0'
         thematic_dict = processing.run("gdal:rastercalculator", {'INPUT_A': slope_path, 'BAND_A': 1, 'INPUT_B': None, 'BAND_B': -1, 'INPUT_C': None, 'BAND_C': -1, 'INPUT_D': None, 'BAND_D': -1, 'INPUT_E': None, 'BAND_E': -1, 'INPUT_F': None, 'BAND_F': -1, 'FORMULA': formula, 'NO_DATA': None, 'RTYPE': 5, 'OPTIONS': '', 'EXTRA': '', 'OUTPUT': thematic_raster_path})
 
         feedback.pushInfo(f'{type(reproj_dict)}')
@@ -518,8 +528,8 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         QgsProject.instance().addMapLayer(slope_raster)
         
         ############################################################ Mapa Temático
-        # max_slope = float(parameters[self.MaxSlope])
-        formula = f'(A < {max_slope}) * 1 + (A >= {max_slope}) * 0'
+        # impediment_slope = float(parameters[self.MaxSlope])
+        formula = f'(0 + (A >= {restrictive_slope}) * 1 + (A >= {impediment_slope}) * 1'
 
         thematic_raster_path = thematic_dict['OUTPUT']
 
@@ -528,7 +538,9 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         color_ramp.setColorRampType(QgsColorRampShader.Interpolated)
         color_ramp.setColorRampItemList([
             QgsColorRampShader.ColorRampItem(0, QColor(255, 0, 0)),
-            QgsColorRampShader.ColorRampItem(1, QColor(0, 255, 0))
+            QgsColorRampShader.ColorRampItem(1, QColor(0, 255, 0)),
+            QgsColorRampShader.ColorRampItem(2, QColor(0, 0, 255))
+
         ])
 
         shader = QgsRasterShader()
@@ -666,4 +678,13 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             for classe in noinfo_classes:
                 feedback.pushInfo(f"{category['type']+'_'+classe} não encontrado para este MI")
         return {}
+    def clear_pycache(self, path):
+        pycache_dir = os.path.join(path, "__pycache__")
+        if os.path.exists(pycache_dir):
+            shutil.rmtree(pycache_dir)
+
+        for root, dirs, files in os.walk(path):
+            for file in files:
+                if file.endswith(".pyc"):
+                    os.remove(os.path.join(root, file))
         ###############################################################################################################################

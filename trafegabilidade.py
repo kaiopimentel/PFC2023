@@ -20,7 +20,8 @@
  *                                                                         *
  ***************************************************************************/
 """
-
+import sys
+sys.dont_write_bytecode = True
 __author__ = 'Arthur Santos/ Kaio Pimentel/ Felipe Viana'
 __date__ = '2023-03-23'
 __copyright__ = ''
