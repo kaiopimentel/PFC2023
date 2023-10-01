@@ -16,7 +16,8 @@ import os
 import shutil
 from osgeo import gdal
 from qgis.PyQt.QtCore import QCoreApplication, QVariant
-# from qgis.analysis import QgsRasterContourAlgorithm
+from qgis.utils import iface
+from qgis.gui import QgsMapCanvas
 from qgis.analysis import QgsNativeAlgorithms
 from qgis.core import (QgsRectangle,
                        QgsProcessing,
@@ -31,6 +32,7 @@ from qgis.core import (QgsRectangle,
                        QgsProcessingParameterRasterDestination,
                        QgsProcessingParameterEnum,
                        QgsProcessingParameterRasterLayer,
+                       QgsProcessingParameterBoolean,
                        QgsCoordinateReferenceSystem,
                        QgsCoordinateTransform,
                        QgsFields,
@@ -87,12 +89,9 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
     OUTPUT = 'OUTPUT'
     MI = 'MI'
     SITUATION = 'SITUATION'
-    FRAME = 'FRAME'
+    # FRAME = 'FRAME'
     CRS = 'CRS' 
-    # SLOPE = 'SLOPE'
-    # MaxSlope = 'MaxSlope'
-    # MapaTematico = 'MapaTematico'
-    
+    BOOLLOADLAYERS = 'BOOLLOADLAYERS'
 
     def tr(self, string):
         """
@@ -186,12 +185,12 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         # We add a feature sink in which to store our processed features (this
         # usually takes the form of a newly created vector layer when the
         # algorithm is run in QGIS).
-        self.addParameter(
-            QgsProcessingParameterFeatureSink(
-                self.FRAME,
-                self.tr('Moldura')
-            )
-        )
+        # self.addParameter(
+        #     QgsProcessingParameterFeatureSink(
+        #         self.FRAME,
+        #         self.tr('Moldura')
+        #     )
+        # )
         
         self.addParameter(
             QgsProcessingParameterRasterDestination(
@@ -199,6 +198,14 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
                 self.tr('Output Raster')
             )
         )      
+
+        self.addParameter(
+            QgsProcessingParameterBoolean(
+                self.BOOLLOADLAYERS,
+                self.tr('Carregar camadas intermediárias'),
+                defaultValue=False
+            )
+        )        
 
     def processAlgorithm(self, parameters, context, feedback):
         """
@@ -227,6 +234,14 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             self.SITUATION,
             context
         )
+
+        boolloadlayers = self.parameterAsBool(
+            parameters, 
+            self.BOOLLOADLAYERS, 
+            context
+        )
+
+        feedback.pushInfo(f'{boolloadlayers}')
 
         if situation == 0:
             #vtr sobre rodas
@@ -257,14 +272,14 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         GeomType = QgsWkbTypes.Polygon
 
         # self.FRAME = 'TEMPORARY_OUTPUT'
-        (sink, dest_id) = self.parameterAsSink(
-            parameters,
-            self.FRAME,
-            context,
-            Fields,
-            GeomType,
-            crs
-        )
+        # (sink, dest_id) = self.parameterAsSink(
+        #     parameters,
+        #     self.FRAME,
+        #     context,
+        #     Fields,
+        #     GeomType,
+        #     crs
+        # )
 
 
         nome = nome.upper()
@@ -374,7 +389,15 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             att = [inom, mi, escala]
         feat.setGeometry(geom)
         feat.setAttributes(att)
-        sink.addFeature(feat, QgsFeatureSink.FastInsert)
+        
+        from qgis.core import QgsVectorLayer, QgsVectorLayerUtils
+
+
+        layer_teste = QgsVectorLayer("Polygon?crs=EPSG:4326", f"Moldura_{nome}", "memory")
+        QgsProject.instance().addMapLayer(layer_teste)
+        sink2 = layer_teste.dataProvider()
+        sink2.addFeature(feat, QgsFeatureSink.FastInsert)
+        dest_id = layer_teste.id()
 
         ###############################################################################################################################
         #OpenTopography
@@ -413,6 +436,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
 
         # self.OUTPUT = 'TEMPORARY_OUTPUT'
         dem_file = self.parameterAsFileOutput(parameters, self.OUTPUT, context)
+        # dem_file = self.parameterAsOutputLayer(parameters, 'TEMPORARY_OUTPUT', context)
         # dem_file = self.parameterAsFileOutput(parameters, 'TEMPORARY_OUTPUT', context)
         feedback.pushInfo(f"Dem file path: {os.path.abspath(dem_file)}")
 
@@ -427,8 +451,9 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         if not raster_layer.isValid():
             feedback.pushInfo(f'Erro ao carregar o raster: {raster_layer.lastError().message()}')
         else:
-            QgsProject.instance().addMapLayer(raster_layer)
-            raster_layer.setCrs(QgsCoordinateReferenceSystem('EPSG:4326'))  # Define explicitamente o SRC
+            if boolloadlayers:
+                QgsProject.instance().addMapLayer(raster_layer)
+                raster_layer.setCrs(QgsCoordinateReferenceSystem('EPSG:4326'))  # Define explicitamente o SRC
 
         ###############################################################################################################################
 
@@ -463,8 +488,9 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         if not reproj_raster.isValid():
             feedback.pushInfo(f'Erro ao carregar o raster REPROJ: {reproj_raster.lastError().message()}')
         else:
-            QgsProject.instance().addMapLayer(reproj_raster)
-            reproj_raster.setCrs(QgsCoordinateReferenceSystem(f'EPSG:{epsg[1]}'))  # Define explicitamente o SRC
+            if boolloadlayers:
+                QgsProject.instance().addMapLayer(reproj_raster)
+                reproj_raster.setCrs(QgsCoordinateReferenceSystem(f'EPSG:{epsg[1]}'))  # Define explicitamente o SRC
 
         slope_path = generate_output_path(dem_file, 'slope')
         processing.run("native:slope", {
@@ -477,7 +503,8 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         if not slope_raster.isValid():
             feedback.pushInfo(f'Erro ao carregar o raster SLOPE: {slope_raster.lastError().message()}')
         else:
-            QgsProject.instance().addMapLayer(slope_raster)
+            if boolloadlayers:    
+                QgsProject.instance().addMapLayer(slope_raster)
         
         ############################################################ Mapa Temático
         formula = f'(0 + (A >= {restrictive_slope}) * 1 + (A >= {impediment_slope}) * 1)'
@@ -511,7 +538,8 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         if not thematic_raster.isValid():
             feedback.pushInfo(f'Erro ao carregar o raster Mapa Temático: {thematic_raster.lastError().message()}')
         else:
-            QgsProject.instance().addMapLayer(thematic_raster)
+            if boolloadlayers:    
+                QgsProject.instance().addMapLayer(thematic_raster)
         
         # from qgis.core import QgsVectorLayer
 
@@ -535,8 +563,9 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         filter_expression_2 = '"DN" = 1'
         duplicate_vectorized_layer.setSubsetString(filter_expression_2)
 
-        QgsProject.instance().addMapLayer(vectorized_layer)
-        QgsProject.instance().addMapLayer(duplicate_vectorized_layer)
+        if boolloadlayers:
+            QgsProject.instance().addMapLayer(vectorized_layer)
+            QgsProject.instance().addMapLayer(duplicate_vectorized_layer)
         
         project = QgsProject.instance()
         project.setCrs(QgsCoordinateReferenceSystem(f'EPSG:{epsg[1]}'))
@@ -580,6 +609,9 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         empty = True
         imp_classes_sources = []
         rest_classes_sources = []
+        classes_to_remove = []
+        canvas = iface.mapCanvas()
+        canvas.freeze(True)
         for category in class_list:
             for classe in category['classes']:
                 # Build WFS request URL
@@ -587,7 +619,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
                     "service": "WFS",
                     "request": "GetFeature",
                     "typeName": "ms:"+classe,
-                    "srsName": "EPSG:4326",
+                    "srsName": f"EPSG:{epsg[1]}",
                     "bbox": bbox,
                     "outputFormat": "GML2",
                     "version": "1.0.0",
@@ -634,18 +666,28 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
                 clipped_layer = clip_result['OUTPUT']
                 
                 # Add the clipped layer to the project
+                aux = 'aux'
                 string_to_find = "<gml:null>missing</gml:null>"
+                
+                
                 if string_to_find in response.text:
                     noinfo_classes.append(category['type']+'_'+classe)
                 elif clipped_layer.featureCount() > 0:
-                    QgsProject.instance().addMapLayer(clipped_layer)
-                    clipped_layer.setName(category['type']+'_'+classe+'_output')
                     empty = False
-
+                    clipped_layer.setName(category['type']+'_'+classe+'_output')
+                    QgsProject.instance().addMapLayer(clipped_layer)
+                    # if boolloadlayers:
+                    #     QgsProject.instance().addMapLayer(clipped_layer)
+                    #     clipped_layer.setName(category['type']+'_'+classe+'_output')
+                    # else:
+                    #     aux = 'aux_aux'
                     if category['type'] == 'hid' or classe in imp_classes:
                         imp_classes_sources.append(clipped_layer.source())
                     elif classe in rest_classes:
                         rest_classes_sources.append(clipped_layer.source())
+                    # if boolloadlayers == False:
+                    #     QgsProject.instance().removeMapLayer(clipped_layer)
+                    classes_to_remove.append(clipped_layer)
                 else:
                     noinfo_classes.append(category['type']+'_'+classe)
 
@@ -657,14 +699,13 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
                         symbol.setColor(QColor.fromRgb(50,50,200))
                     elif category['type'] == 'out':
                         symbol.setColor(QColor.fromRgb(30,30,30))   
-
+      
         if empty == True:
             feedback.pushInfo('Sem vetores para esse MI')
         else:
             for classe in noinfo_classes:
                 feedback.pushInfo(f"{category['type']+'_'+classe} não encontrado para este MI")
         
-        imp_classes_sources.append(vectorized_layer.source())
         merge_result = processing.run("native:mergevectorlayers", {'LAYERS':imp_classes_sources,'CRS':None,'OUTPUT':'TEMPORARY_OUTPUT'})
         imp_merge_layer = merge_result['OUTPUT']
         QgsProject.instance().addMapLayer(imp_merge_layer)
@@ -676,8 +717,6 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         rest_classes_sources.append(duplicate_vectorized_layer.source())
         merge_result = processing.run("native:mergevectorlayers", {'LAYERS':rest_classes_sources,'CRS':None,'OUTPUT':'TEMPORARY_OUTPUT'})
         rest_merge_layer = merge_result['OUTPUT']
-        # QgsProject.instance().addMapLayer(rest_merge_layer)
-        # rest_merge_layer.setName('Restritivo')
 
         diff_dict = processing.run("native:difference", {'INPUT':rest_merge_layer,'OVERLAY':imp_merge_layer,'OUTPUT':'TEMPORARY_OUTPUT','GRID_SIZE':None})
         rest_diff_layer = diff_dict['OUTPUT']
@@ -686,6 +725,12 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         symbol = rest_diff_layer.renderer().symbol()
         symbol.setColor(QColor.fromRgb(250,250,0))
         
+        if boolloadlayers == False:
+            for classe in classes_to_remove:
+                QgsProject.instance().removeMapLayer(classe)
+
+        # QgsProject.instance().removeMapLayer(rest_diff_layer)
+        canvas.freeze(False)
 
         return {}
     def clear_pycache(self, path):
