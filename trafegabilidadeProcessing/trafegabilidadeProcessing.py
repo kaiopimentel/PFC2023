@@ -372,14 +372,9 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
                 mi = None
 
             att = [inom, mi, escala]
-        # feedback.pushInfo('INOM: {}'.format(inom))
-        # feedback.pushInfo('MI: {}'.format(mi))
         feat.setGeometry(geom)
         feat.setAttributes(att)
         sink.addFeature(feat, QgsFeatureSink.FastInsert)
-
-        # if sink is None:
-        #     raise QgsProcessingException(self.invalidSinkError(parameters, self.FRAME))
 
         ###############################################################################################################################
         #OpenTopography
@@ -446,7 +441,6 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         crs = CRS.from_dict({'proj': 'utm', 'zone': utm_zone[0:2], 'south': south_hemisphere})
         epsg = crs.to_authority()
         ############################################################ Reprojetar
-        # import tempfile
 
         reproj_path = generate_output_path(dem_file, 'reproj')
         processing.run("gdal:warpreproject", {
@@ -486,7 +480,6 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             QgsProject.instance().addMapLayer(slope_raster)
         
         ############################################################ Mapa Temático
-        # impediment_slope = float(parameters[self.MaxSlope])
         formula = f'(0 + (A >= {restrictive_slope}) * 1 + (A >= {impediment_slope}) * 1)'
         thematic_raster_path = generate_output_path(dem_file, 'thematic')
         processing.run("gdal:rastercalculator", {
@@ -499,10 +492,6 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             'EXTRA': '',
             'OUTPUT': thematic_raster_path
         })         
-        
-        # formula = f'(0 + (A >= {restrictive_slope}) * 1 + (A >= {impediment_slope}) * 1)'
-
-        # thematic_raster_path = thematic_dict['OUTPUT']
 
         # Defina o estilo de cores contínuas
         color_ramp = QgsColorRampShader()
