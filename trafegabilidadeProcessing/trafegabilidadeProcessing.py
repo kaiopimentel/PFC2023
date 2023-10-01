@@ -16,6 +16,8 @@ import os
 import shutil
 from osgeo import gdal
 from qgis.PyQt.QtCore import QCoreApplication, QVariant
+# from qgis.analysis import QgsRasterContourAlgorithm
+from qgis.analysis import QgsNativeAlgorithms
 from qgis.core import (QgsRectangle,
                        QgsProcessing,
                        QgsFeatureSink,
@@ -28,6 +30,7 @@ from qgis.core import (QgsRectangle,
                        QgsProcessingParameterCrs,
                        QgsProcessingParameterRasterDestination,
                        QgsProcessingParameterEnum,
+                       QgsProcessingParameterRasterLayer,
                        QgsCoordinateReferenceSystem,
                        QgsCoordinateTransform,
                        QgsFields,
@@ -44,7 +47,10 @@ from qgis.core import (QgsRectangle,
                        QgsRasterShader,
                        QgsSingleBandPseudoColorRenderer, 
                        QgsColorRampShader, 
-                       QgsRasterShader
+                       QgsRasterShader,
+                       QgsProcessingMultiStepFeedback,
+                       QgsProcessingParameterVectorDestination,
+                       QgsApplication
                        )
 from qgis.PyQt.QtGui import QColor
 from qgis import processing
@@ -58,7 +64,7 @@ from .calculo_declividade import calculate_slope
 from .get_central_coord import get_raster_center_point
 from .get_utm_zone import get_zone_number
 
-from .classList import class_list
+from .classList import class_list, rest_classes, imp_classes
 
 class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
     """
@@ -77,16 +83,16 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
     # Constants used to refer to parameters and outputs. They will be
     # used when calling the algorithm from another algorithm, or when
     # calling from the QGIS console.
-    INPUT = 'INPUT'
+    # INPUT = 'INPUT'
     OUTPUT = 'OUTPUT'
     MI = 'MI'
-    TYPE = 'TYPE'
+    SITUATION = 'SITUATION'
     FRAME = 'FRAME'
     CRS = 'CRS' 
-    SLOPE = 'SLOPE'
-    MaxSlope = 'MaxSlope'
-    MapaTematico = 'MapaTematico'
-    SITUATION = 'SITUATION'
+    # SLOPE = 'SLOPE'
+    # MaxSlope = 'MaxSlope'
+    # MapaTematico = 'MapaTematico'
+    
 
     def tr(self, string):
         """
@@ -152,17 +158,6 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         with some other properties.
         """
         
-        # We add the input vector features source. It can have any kind of
-        # geometry.
-        self.addParameter(
-            QgsProcessingParameterFeatureSource(
-                self.INPUT,
-                self.tr('Camada de Entrada'),
-                [QgsProcessing.TypeVectorAnyGeometry],
-                optional = True
-            )
-        )
-        
         self.addParameter(
             QgsProcessingParameterString(
                 self.MI,
@@ -178,13 +173,6 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
                 defaultValue = 0
             )
 
-        )
-        self.addParameter(
-            QgsProcessingParameterString(
-                self.MaxSlope,
-                self.tr('Declividade máxima permitida para trajeto'),
-                optional = True
-            )
         )
 
         self.addParameter(
@@ -210,20 +198,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
                 self.OUTPUT,
                 self.tr('Output Raster')
             )
-        )
-
-        self.addParameter(
-            QgsProcessingParameterRasterDestination(
-                self.SLOPE,
-                self.tr('Output Slope')
-            )
-        )
-        self.addParameter(
-            QgsProcessingParameterRasterDestination(
-                self.MapaTematico,
-                self.tr('Output Mapa Temático')
-            )
-        )        
+        )      
 
     def processAlgorithm(self, parameters, context, feedback):
         """
@@ -260,11 +235,11 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         elif situation == 1:
             #vtr sobre lagartas
             restrictive_slope = 17
-            impediment_slope=26
+            impediment_slope = 26
         elif situation == 2:
             #tropa a pé
             restrictive_slope = 26
-            impediment_slope=45
+            impediment_slope = 45
         ###############################################################################################################################
         # LFTools
         # Checking for geographic coordinate reference system
@@ -281,6 +256,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         Fields.append(QgsField(self.tr('escala'), QVariant.Int))
         GeomType = QgsWkbTypes.Polygon
 
+        # self.FRAME = 'TEMPORARY_OUTPUT'
         (sink, dest_id) = self.parameterAsSink(
             parameters,
             self.FRAME,
@@ -289,6 +265,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             GeomType,
             crs
         )
+
 
         nome = nome.upper()
         lista = nome.split('-')
@@ -401,8 +378,8 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         feat.setAttributes(att)
         sink.addFeature(feat, QgsFeatureSink.FastInsert)
 
-        if sink is None:
-            raise QgsProcessingException(self.invalidSinkError(parameters, self.FRAME))
+        # if sink is None:
+        #     raise QgsProcessingException(self.invalidSinkError(parameters, self.FRAME))
 
         ###############################################################################################################################
         #OpenTopography
@@ -428,148 +405,161 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
 
         dem_code = 'SRTMGL3'
 
+        from qgis.core import QgsVectorLayer
+        import requests
+
+        def generate_output_path(base_path, suffix):
+            base_name = os.path.splitext(os.path.basename(base_path))[0]
+            directory = os.path.dirname(base_path)
+            return os.path.join(directory, f"{base_name}_{suffix}.tif")
+
         dem_url = f'https://portal.opentopography.org/API/globaldem?demtype={dem_code}&south={south}&north={north}&west={west}&east={east}&outputFormat=GTiff'
         dem_url=dem_url + "&API_Key=" + parameters['API_key']
 
+        # self.OUTPUT = 'TEMPORARY_OUTPUT'
         dem_file = self.parameterAsFileOutput(parameters, self.OUTPUT, context)
+        # dem_file = self.parameterAsFileOutput(parameters, 'TEMPORARY_OUTPUT', context)
+        feedback.pushInfo(f"Dem file path: {os.path.abspath(dem_file)}")
+
         try:
-            # Download file
-            alg_params = {
-                'URL': dem_url,
-                'OUTPUT': dem_file
-            }
-            outputs['DownloadFile'] = processing.run('native:filedownloader', alg_params, context=context, feedback=feedback, is_child_algorithm=True)
+            alg_params = {'URL': dem_url, 'OUTPUT': dem_file}
+            processing.run('native:filedownloader', alg_params, context=context, feedback=feedback, is_child_algorithm=True)
         except:
             response = requests.request("GET", dem_url, headers={}, data={})
-            
-            raise QgsProcessingException (response.text.split('<error>')[1][:-8])
-        
-        # Load layer into project
-        dem_file_name = os.path.basename(dem_file)
-        if dem_file_name == 'OUTPUT.tif':
-            alg_params = {           
-                'INPUT': dem_file,
-                'NAME': dem_code+"[Memory]"
-            }
-        else:
-            alg_params = {           
-                'INPUT': dem_file,
-                'NAME': dem_file_name
-            }
+            raise QgsProcessingException(response.text.split('<error>')[1][:-8])
 
-        ###############################################################################################################################
-
-        # Substitua as seguintes strings com o nome da camada e o caminho de saída
-
-        raster_path = outputs["DownloadFile"]["OUTPUT"]
-
-        
-        raster_layer = QgsRasterLayer(raster_path, f'MDE_{nome}')
+        raster_layer = QgsRasterLayer(dem_file, f'MDE_{nome}')
         if not raster_layer.isValid():
             feedback.pushInfo(f'Erro ao carregar o raster: {raster_layer.lastError().message()}')
         else:
-            # Adiciona a camada raster ao projeto do QGIS
-            QgsProject.instance().addMapLayer(raster_layer) 
+            QgsProject.instance().addMapLayer(raster_layer)
+            raster_layer.setCrs(QgsCoordinateReferenceSystem('EPSG:4326'))  # Define explicitamente o SRC
+
+        ###############################################################################################################################
 
         ############################################################ Descobrir Fuso UTM
-
         ponto_central = get_raster_center_point(dem_file)
-
         point_x = ponto_central.x()
         point_y = ponto_central.y()
-        
         utm_zone = get_zone_number(point_y, point_x)
-
-        if point_y <= 0:
-            south_hemisphere = True
-        else:
-            south_hemisphere = False
-
+        south_hemisphere = True if point_y <= 0 else False
         crs = CRS.from_dict({'proj': 'utm', 'zone': utm_zone[0:2], 'south': south_hemisphere})
         epsg = crs.to_authority()
-
-        # feedback.pushInfo(f'{epsg[1]}')
-
         ############################################################ Reprojetar
-        import tempfile
+        # import tempfile
 
-        # Criar um arquivo temporário para o reprojeção
-        reproj_fd, reproj_path = tempfile.mkstemp(suffix='.tif')
-        os.close(reproj_fd)  # Fechar o descritor de arquivo, já que só precisamos do caminho
+        reproj_path = generate_output_path(dem_file, 'reproj')
+        processing.run("gdal:warpreproject", {
+            'INPUT': dem_file,
+            'SOURCE_CRS': QgsCoordinateReferenceSystem('EPSG:4326'),
+            'TARGET_CRS': QgsCoordinateReferenceSystem(f'EPSG:{epsg[1]}'),
+            'RESAMPLING': 0,
+            'NODATA': None,
+            'TARGET_RESOLUTION': 30,
+            'OPTIONS': '',
+            'DATA_TYPE': 0,
+            'TARGET_EXTENT': None,
+            'TARGET_EXTENT_CRS': None,
+            'MULTITHREADING': False,
+            'EXTRA': '',
+            'OUTPUT': reproj_path
+        })
 
-        # Reprojeção
-        reproj_dict = processing.run("gdal:warpreproject", {'INPUT': dem_file, 'SOURCE_CRS': QgsCoordinateReferenceSystem('EPSG:4326'), 'TARGET_CRS': QgsCoordinateReferenceSystem(f'EPSG:{epsg[1]}'), 'RESAMPLING': 0, 'NODATA': None, 'TARGET_RESOLUTION': 30, 'OPTIONS': '', 'DATA_TYPE': 0, 'TARGET_EXTENT': None, 'TARGET_EXTENT_CRS': None, 'MULTITHREADING': False, 'EXTRA': '', 'OUTPUT': reproj_path})
-
-        # Criar um arquivo temporário para a declividade
-        slope_fd, slope_path = tempfile.mkstemp(suffix='.tif')
-        os.close(slope_fd)
-
-        # Cálculo de Declividade
-        slope_dict = processing.run("native:slope", {'INPUT': reproj_path, 'Z_FACTOR': 1, 'OUTPUT': slope_path})
-
-        # Criar um arquivo temporário para o mapa temático
-        thematic_fd, thematic_raster_path = tempfile.mkstemp(suffix='.tif')
-        os.close(thematic_fd)
-
-        # Mapa Temático
-        formula = f'(A < {impediment_slope}) * 1 + (A >= {impediment_slope}) * 0'
-        thematic_dict = processing.run("gdal:rastercalculator", {'INPUT_A': slope_path, 'BAND_A': 1, 'INPUT_B': None, 'BAND_B': -1, 'INPUT_C': None, 'BAND_C': -1, 'INPUT_D': None, 'BAND_D': -1, 'INPUT_E': None, 'BAND_E': -1, 'INPUT_F': None, 'BAND_F': -1, 'FORMULA': formula, 'NO_DATA': None, 'RTYPE': 5, 'OPTIONS': '', 'EXTRA': '', 'OUTPUT': thematic_raster_path})
-
-        feedback.pushInfo(f'{type(reproj_dict)}')
-        feedback.pushInfo(f'{reproj_dict}')
-
-        reproj_path = reproj_dict['OUTPUT']
         reproj_raster = QgsRasterLayer(reproj_path, f'REPROJ_{nome}')
-        QgsProject.instance().addMapLayer(reproj_raster)
-        ############################################################ Cálculo Declividade
-        
-        slope_path = slope_dict['OUTPUT']
+        if not reproj_raster.isValid():
+            feedback.pushInfo(f'Erro ao carregar o raster REPROJ: {reproj_raster.lastError().message()}')
+        else:
+            QgsProject.instance().addMapLayer(reproj_raster)
+            reproj_raster.setCrs(QgsCoordinateReferenceSystem(f'EPSG:{epsg[1]}'))  # Define explicitamente o SRC
+
+        slope_path = generate_output_path(dem_file, 'slope')
+        processing.run("native:slope", {
+            'INPUT': reproj_path,
+            'Z_FACTOR': 1,
+            'OUTPUT': slope_path
+        })
+
         slope_raster = QgsRasterLayer(slope_path, f'SLOPE_{nome}')
-        QgsProject.instance().addMapLayer(slope_raster)
+        if not slope_raster.isValid():
+            feedback.pushInfo(f'Erro ao carregar o raster SLOPE: {slope_raster.lastError().message()}')
+        else:
+            QgsProject.instance().addMapLayer(slope_raster)
         
         ############################################################ Mapa Temático
         # impediment_slope = float(parameters[self.MaxSlope])
-        formula = f'(0 + (A >= {restrictive_slope}) * 1 + (A >= {impediment_slope}) * 1'
+        formula = f'(0 + (A >= {restrictive_slope}) * 1 + (A >= {impediment_slope}) * 1)'
+        thematic_raster_path = generate_output_path(dem_file, 'thematic')
+        processing.run("gdal:rastercalculator", {
+            'INPUT_A': slope_path,
+            'BAND_A': 1,
+            'FORMULA': formula,
+            'NO_DATA': None,
+            'RTYPE': 5,
+            'OPTIONS': '',
+            'EXTRA': '',
+            'OUTPUT': thematic_raster_path
+        })         
+        
+        # formula = f'(0 + (A >= {restrictive_slope}) * 1 + (A >= {impediment_slope}) * 1)'
 
-        thematic_raster_path = thematic_dict['OUTPUT']
+        # thematic_raster_path = thematic_dict['OUTPUT']
 
         # Defina o estilo de cores contínuas
         color_ramp = QgsColorRampShader()
         color_ramp.setColorRampType(QgsColorRampShader.Interpolated)
         color_ramp.setColorRampItemList([
-            QgsColorRampShader.ColorRampItem(0, QColor(255, 0, 0)),
-            QgsColorRampShader.ColorRampItem(1, QColor(0, 255, 0)),
-            QgsColorRampShader.ColorRampItem(2, QColor(0, 0, 255))
+            QgsColorRampShader.ColorRampItem(0, QColor(0, 255, 0)),
+            QgsColorRampShader.ColorRampItem(1, QColor(255, 255, 0)),
+            QgsColorRampShader.ColorRampItem(2, QColor(255, 0, 0))
 
         ])
-
         shader = QgsRasterShader()
         shader.setRasterShaderFunction(color_ramp)
 
         thematic_raster = QgsRasterLayer(thematic_raster_path, f'MapaTematico_{nome}')
         renderer = QgsSingleBandPseudoColorRenderer(thematic_raster.dataProvider(), 1, shader)
         thematic_raster.setRenderer(renderer)
-
-        QgsProject.instance().addMapLayer(thematic_raster)
+        if not thematic_raster.isValid():
+            feedback.pushInfo(f'Erro ao carregar o raster Mapa Temático: {thematic_raster.lastError().message()}')
+        else:
+            QgsProject.instance().addMapLayer(thematic_raster)
         
-        from qgis.core import QgsVectorLayer
+        # from qgis.core import QgsVectorLayer
 
-        vectorized_dict = processing.run("gdal:polygonize", {'INPUT':thematic_raster_path,'BAND':1,'FIELD':'DN','EIGHT_CONNECTEDNESS':True,'EXTRA':'','OUTPUT':'TEMPORARY_OUTPUT'})  
-        feedback.pushInfo(f'{vectorized_dict}')
-        feedback.pushInfo(f'{type(vectorized_dict)}')
-        vectorized_layer_path = vectorized_dict['OUTPUT']
-        feedback.pushInfo(f'{vectorized_layer_path}')
-        feedback.pushInfo(f'{type(vectorized_layer_path)}')
-        vectorized_layer = QgsVectorLayer(vectorized_layer_path, 'vectorized')
+        vectorized_layer_path = generate_output_path(dem_file, 'vectorized')[:-4] + '.gpkg'
+        processing.run("gdal:polygonize", {
+            'INPUT': thematic_raster_path,
+            'BAND': 1,
+            'FIELD': 'DN',
+            'EIGHT_CONNECTEDNESS': True,
+            'EXTRA': '',
+            'OUTPUT': vectorized_layer_path
+        })        
+        vectorized_layer = QgsVectorLayer(vectorized_layer_path, 'vectorized_impeditivo')
+        vectorized_layer.setCrs(QgsCoordinateReferenceSystem(f'EPSG:{epsg[1]}'))
         
+        duplicate_vectorized_layer = QgsVectorLayer(vectorized_layer.source(), "vectorized_restritivo", vectorized_layer.providerType())
+        duplicate_vectorized_layer.setCrs(QgsCoordinateReferenceSystem(f'EPSG:{epsg[1]}'))
+        
+        filter_expression = '"DN" = 2'
+        vectorized_layer.setSubsetString(filter_expression)
+        filter_expression_2 = '"DN" = 1'
+        duplicate_vectorized_layer.setSubsetString(filter_expression_2)
+
         QgsProject.instance().addMapLayer(vectorized_layer)
+        QgsProject.instance().addMapLayer(duplicate_vectorized_layer)
+        
+        project = QgsProject.instance()
+        project.setCrs(QgsCoordinateReferenceSystem(f'EPSG:{epsg[1]}'))
+
+        # project.setCrs(QgsCoordinateReferenceSystem('EPSG:4326'))
 
         import requests
         import tempfile
         from qgis.PyQt.QtCore import QUrl
-        from qgis.core import QgsVectorLayer, QgsProject, QgsProcessingUtils, QgsMessageLog, Qgis
+        from qgis.core import QgsProject, QgsProcessingUtils, QgsMessageLog, Qgis
         from qgis.analysis import QgsNativeAlgorithms
-        from qgis.core import QgsApplication, QgsProcessingFeatureSourceDefinition
+        from qgis.core import QgsProcessingFeatureSourceDefinition
 
         # Register the native algorithms for processing.
         QgsApplication.processingRegistry().addProvider(QgsNativeAlgorithms())
@@ -599,6 +589,8 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
 
         noinfo_classes = []
         empty = True
+        imp_classes_sources = []
+        rest_classes_sources = []
         for category in class_list:
             for classe in category['classes']:
                 # Build WFS request URL
@@ -660,6 +652,11 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
                     QgsProject.instance().addMapLayer(clipped_layer)
                     clipped_layer.setName(category['type']+'_'+classe+'_output')
                     empty = False
+
+                    if category['type'] == 'hid' or classe in imp_classes:
+                        imp_classes_sources.append(clipped_layer.source())
+                    elif classe in rest_classes:
+                        rest_classes_sources.append(clipped_layer.source())
                 else:
                     noinfo_classes.append(category['type']+'_'+classe)
 
@@ -677,6 +674,30 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         else:
             for classe in noinfo_classes:
                 feedback.pushInfo(f"{category['type']+'_'+classe} não encontrado para este MI")
+        
+        imp_classes_sources.append(vectorized_layer.source())
+        merge_result = processing.run("native:mergevectorlayers", {'LAYERS':imp_classes_sources,'CRS':None,'OUTPUT':'TEMPORARY_OUTPUT'})
+        imp_merge_layer = merge_result['OUTPUT']
+        QgsProject.instance().addMapLayer(imp_merge_layer)
+        imp_merge_layer.setName('Impeditivo')
+        symbol = imp_merge_layer.renderer().symbol()
+        symbol.setColor(QColor.fromRgb(250,50,50))
+
+
+        rest_classes_sources.append(duplicate_vectorized_layer.source())
+        merge_result = processing.run("native:mergevectorlayers", {'LAYERS':rest_classes_sources,'CRS':None,'OUTPUT':'TEMPORARY_OUTPUT'})
+        rest_merge_layer = merge_result['OUTPUT']
+        # QgsProject.instance().addMapLayer(rest_merge_layer)
+        # rest_merge_layer.setName('Restritivo')
+
+        diff_dict = processing.run("native:difference", {'INPUT':rest_merge_layer,'OVERLAY':imp_merge_layer,'OUTPUT':'TEMPORARY_OUTPUT','GRID_SIZE':None})
+        rest_diff_layer = diff_dict['OUTPUT']
+        QgsProject.instance().addMapLayer(rest_diff_layer)
+        rest_diff_layer.setName('Restritivo')
+        symbol = rest_diff_layer.renderer().symbol()
+        symbol.setColor(QColor.fromRgb(250,250,0))
+        
+
         return {}
     def clear_pycache(self, path):
         pycache_dir = os.path.join(path, "__pycache__")

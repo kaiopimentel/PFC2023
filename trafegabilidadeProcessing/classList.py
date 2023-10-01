@@ -39,3 +39,14 @@ class_list = [
     }
 
 ]
+
+rest_classes = [
+        "Cerrado_Cerradao_A"
+]
+
+imp_classes = [
+        "Brejo_Pantano_A",
+        "Floresta_A",
+        "Mangue_A",
+        "Veg_Cultivada_A"
+]
