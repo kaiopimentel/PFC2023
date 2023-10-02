@@ -706,7 +706,10 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
                         rest_classes_sources.append(clipped_layer.source())
                     # if boolloadlayers == False:
                     #     QgsProject.instance().removeMapLayer(clipped_layer)
-                    classes_to_remove.append(clipped_layer)
+                    if not classe == 'Trecho_Rodoviario_L':
+                        classes_to_remove.append(clipped_layer)
+                    else:
+                        clipped_layer.setName("Trecho_Rodoviario")
                 else:
                     noinfo_classes.append(category['type']+'_'+classe)
 
@@ -729,14 +732,14 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             feedback.pushInfo('Sem vetores para esse MI')
         else:
             for classe in noinfo_classes:
-                feedback.pushInfo(f"{category['type']+'_'+classe} não encontrado para este MI")
+                feedback.pushInfo(f"{classe} não encontrado para este MI")
         
         merge_result = processing.run("native:mergevectorlayers", {'LAYERS':edif_classes_sources,'CRS':None,'OUTPUT':'TEMPORARY_OUTPUT'})
         edif_merge_layer = merge_result['OUTPUT']
         QgsProject.instance().addMapLayer(edif_merge_layer)
         edif_merge_layer.setName('Edificacoes')
         symbol = edif_merge_layer.renderer().symbol()
-        symbol.setColor(QColor.fromRgb(0,0,0))
+        symbol.setColor(QColor.fromRgb(160,120,90))
 
         merge_result = processing.run("native:mergevectorlayers", {'LAYERS':imp_classes_sources,'CRS':None,'OUTPUT':'TEMPORARY_OUTPUT'})
         imp_merge_layer = merge_result['OUTPUT']
