@@ -52,7 +52,8 @@ from qgis.core import (QgsRectangle,
                        QgsRasterShader,
                        QgsProcessingMultiStepFeedback,
                        QgsProcessingParameterVectorDestination,
-                       QgsApplication
+                       QgsApplication,
+                       QgsLayerTreeLayer
                        )
 from qgis.PyQt.QtGui import QColor
 from qgis import processing
@@ -253,6 +254,24 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             restrictive_slope = 26
             impediment_slope = 45
         ###############################################################################################################################
+        
+        url_with_params = "type=xyz&url=https%3A//mt1.google.com/vt/lyrs%3Ds%26x%3D%7Bx%7D%26y%3D%7By%7D%26z%3D%7Bz%7D&zmax=19&zmin=0&crs=EPSG3857"
+        google_layer = QgsRasterLayer(url_with_params, "Google Satellite", "wms")
+
+        if not google_layer.isValid():
+            print("Camada não foi carregada corretamente!")
+        else:
+            # Adiciona a camada de satélite
+            QgsProject.instance().addMapLayer(google_layer, False)
+
+            # Coloque a camada de satélite na parte inferior da pilha de camadas
+            root = QgsProject.instance().layerTreeRoot()
+            google_layer_node = QgsLayerTreeLayer(google_layer)
+            cloned_node = google_layer_node.clone()
+            root.insertChildNode(0, cloned_node)  # 0 significa a primeira posição
+            root.removeChildNode(google_layer_node)
+        
+        
         # LFTools
         # Checking for geographic coordinate reference system
         if not crs.isGeographic():
