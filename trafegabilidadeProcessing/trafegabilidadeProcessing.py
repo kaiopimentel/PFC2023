@@ -625,7 +625,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         edif_classes_sources = []
         classes_to_remove = []
         canvas = iface.mapCanvas()
-        # canvas.freeze(True)
+        canvas.freeze(True)
         for category in class_list:
             for classe in category['classes']:
                 # Build WFS request URL
@@ -757,6 +757,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         symbol = rest_diff_layer.renderer().symbol()
         symbol.setColor(QColor.fromRgb(250,250,0))
         
+        classes_to_remove.append(frame_layer)
         if boolloadlayers == False:
             for classe in classes_to_remove:
                 QgsProject.instance().removeMapLayer(classe)
