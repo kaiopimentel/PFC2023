@@ -191,21 +191,20 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         #         self.tr('Moldura')
         #     )
         # )
-        
-        self.addParameter(
-            QgsProcessingParameterRasterDestination(
-                self.OUTPUT,
-                self.tr('Output Raster')
-            )
-        )      
-
         self.addParameter(
             QgsProcessingParameterBoolean(
                 self.BOOLLOADLAYERS,
                 self.tr('Carregar camadas intermediárias'),
                 defaultValue=False
             )
-        )        
+        ) 
+
+        self.addParameter(
+            QgsProcessingParameterRasterDestination(
+                self.OUTPUT,
+                self.tr('Output Raster')
+            )
+        )                     
 
     def processAlgorithm(self, parameters, context, feedback):
         """
@@ -240,8 +239,6 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             self.BOOLLOADLAYERS, 
             context
         )
-
-        feedback.pushInfo(f'{boolloadlayers}')
 
         if situation == 0:
             #vtr sobre rodas
@@ -434,10 +431,7 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         dem_url = f'https://portal.opentopography.org/API/globaldem?demtype={dem_code}&south={south}&north={north}&west={west}&east={east}&outputFormat=GTiff'
         dem_url=dem_url + "&API_Key=" + parameters['API_key']
 
-        # self.OUTPUT = 'TEMPORARY_OUTPUT'
         dem_file = self.parameterAsFileOutput(parameters, self.OUTPUT, context)
-        # dem_file = self.parameterAsOutputLayer(parameters, 'TEMPORARY_OUTPUT', context)
-        # dem_file = self.parameterAsFileOutput(parameters, 'TEMPORARY_OUTPUT', context)
         feedback.pushInfo(f"Dem file path: {os.path.abspath(dem_file)}")
 
         try:
@@ -609,9 +603,10 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         empty = True
         imp_classes_sources = []
         rest_classes_sources = []
+        edif_classes_sources = []
         classes_to_remove = []
         canvas = iface.mapCanvas()
-        canvas.freeze(True)
+        # canvas.freeze(True)
         for category in class_list:
             for classe in category['classes']:
                 # Build WFS request URL
@@ -674,8 +669,13 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
                     noinfo_classes.append(category['type']+'_'+classe)
                 elif clipped_layer.featureCount() > 0:
                     empty = False
-                    clipped_layer.setName(category['type']+'_'+classe+'_output')
                     QgsProject.instance().addMapLayer(clipped_layer)
+                    if category['type'] == 'edif':
+                        classe_rename = classe.replace("EDF_", "").replace("Edif_", "")
+                        clipped_layer.setName(category['type']+'_'+classe_rename+'_output')
+                        edif_classes_sources.append(clipped_layer)
+                    else:
+                        clipped_layer.setName(category['type']+'_'+classe+'_output')
                     # if boolloadlayers:
                     #     QgsProject.instance().addMapLayer(clipped_layer)
                     #     clipped_layer.setName(category['type']+'_'+classe+'_output')
@@ -693,12 +693,18 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
 
                 if not f'{type(clipped_layer.renderer())}' == "<class 'NoneType'>":
                     symbol = clipped_layer.renderer().symbol()
+                    if clipped_layer.type() == QgsMapLayer.VectorLayer and clipped_layer.geometryType() == QgsWkbTypes.LineGeometry:
+                        symbol.setWidth(0.8)
+                        clipped_layer.triggerRepaint()                            
                     if category['type'] == 'veg':
                         symbol.setColor(QColor.fromRgb(50,200,50))
                     elif category['type'] == 'hid':
                         symbol.setColor(QColor.fromRgb(50,50,200))
                     elif category['type'] == 'out':
-                        symbol.setColor(QColor.fromRgb(30,30,30))   
+                        symbol.setColor(QColor.fromRgb(30,30,30)) 
+                    elif category['type'] == 'edif':
+                        symbol.setColor(QColor.fromRgb(0,0,0)) 
+                      
       
         if empty == True:
             feedback.pushInfo('Sem vetores para esse MI')
@@ -706,6 +712,13 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
             for classe in noinfo_classes:
                 feedback.pushInfo(f"{category['type']+'_'+classe} não encontrado para este MI")
         
+        merge_result = processing.run("native:mergevectorlayers", {'LAYERS':edif_classes_sources,'CRS':None,'OUTPUT':'TEMPORARY_OUTPUT'})
+        edif_merge_layer = merge_result['OUTPUT']
+        QgsProject.instance().addMapLayer(edif_merge_layer)
+        edif_merge_layer.setName('Edificacoes')
+        symbol = edif_merge_layer.renderer().symbol()
+        symbol.setColor(QColor.fromRgb(0,0,0))
+
         merge_result = processing.run("native:mergevectorlayers", {'LAYERS':imp_classes_sources,'CRS':None,'OUTPUT':'TEMPORARY_OUTPUT'})
         imp_merge_layer = merge_result['OUTPUT']
         QgsProject.instance().addMapLayer(imp_merge_layer)
@@ -728,6 +741,15 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
         if boolloadlayers == False:
             for classe in classes_to_remove:
                 QgsProject.instance().removeMapLayer(classe)
+
+        diff_dict = processing.run("native:difference", {'INPUT':frame_layer,'OVERLAY':imp_merge_layer,'OUTPUT':'TEMPORARY_OUTPUT','GRID_SIZE':None})
+        adeq1_diff_layer = diff_dict['OUTPUT']
+        diff_dict = processing.run("native:difference", {'INPUT':adeq1_diff_layer,'OVERLAY':rest_diff_layer,'OUTPUT':'TEMPORARY_OUTPUT','GRID_SIZE':None})
+        adeq2_diff_layer = diff_dict['OUTPUT']
+        QgsProject.instance().addMapLayer(adeq2_diff_layer)
+        adeq2_diff_layer.setName('Adequado')
+        symbol = adeq2_diff_layer.renderer().symbol()
+        symbol.setColor(QColor.fromRgb(50,250,50))
 
         # QgsProject.instance().removeMapLayer(rest_diff_layer)
         canvas.freeze(False)
