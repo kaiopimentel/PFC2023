@@ -67,7 +67,7 @@ from .calculo_declividade import calculate_slope
 from .get_central_coord import get_raster_center_point
 from .get_utm_zone import get_zone_number
 
-from .classList import class_list, rest_classes, imp_classes
+from .classList import class_list, rest_classes_0, imp_classes_0, rest_classes_1, imp_classes_1, rest_classes_2, imp_classes_2
 
 class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
     """
@@ -617,6 +617,19 @@ class TrafegabilidadeProcessingAlgorithm(QgsProcessingAlgorithm):
 
         # Define the bbox string
         bbox = f"{west},{south},{east},{north}"
+
+        if situation == 0:
+            #vtr sobre rodas
+            imp_classes = imp_classes_0
+            rest_classes = rest_classes_0
+        elif situation == 1:
+            #vtr sobre lagartas
+            imp_classes = imp_classes_1
+            rest_classes = rest_classes_1
+        elif situation == 2:
+            #tropa a pé
+            imp_classes = imp_classes_2
+            rest_classes = rest_classes_2
 
         noinfo_classes = []
         empty = True
