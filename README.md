@@ -1,4 +1,4 @@
-# Projeto Final de Curso (PFC2023) - Mapas de Trafegabilidade para o Exército
+# Projeto Final de Curso (PFC2023) - Elaboração Automatizada de Mapas de Trafegabilidade
 
 O projeto PFC2023 foi desenvolvido por nossa equipe com o objetivo de auxiliar o Exército na geração de mapas de trafegabilidade, considerando diferentes meios de tráfego e regiões específicas na escala de 1:25000. O sistema categoriza áreas como:
 
