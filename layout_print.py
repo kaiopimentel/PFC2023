@@ -24,12 +24,6 @@ layout.initializeDefaults()
 layout.setName(layout_name)
 manager.addLayout(layout)
 
-# Definir o tamanho do layout como A4 (210 mm x 297 mm)
-layout.pageCollection().pages()[0].setPageSize(QgsLayoutSize(210, 297, QgsUnitTypes.LayoutMillimeters))
-
-layout.setName(layout_name)
-manager.addLayout(layout)
-
 # 2. Adicionar item de mapa maior e centralizado
 map = QgsLayoutItemMap(layout)
 map.setRect(5, 30, 290, 180)  # Ajuste inicial de posição e dimensões
