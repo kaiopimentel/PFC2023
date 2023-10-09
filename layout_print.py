@@ -82,6 +82,8 @@ layout.addLayoutItem(scale_bar)
 # 5. Adicionar seta de orientação
 north_arrow = QgsLayoutItemPicture(layout)
 north_arrow.setPicturePath(":/images/north_arrows/layout_default_north_arrow.svg")
+north_arrow.setLinkedMap(map)
+north_arrow.setNorthMode(QgsLayoutItemPicture.GridNorth)  # Isso define a seta para seguir o Grid North
 north_arrow.attemptResize(QgsLayoutSize(20, 20, QgsUnitTypes.LayoutMillimeters))
 north_arrow.attemptMove(QgsLayoutPoint(270, 35, QgsUnitTypes.LayoutMillimeters))
 layout.addLayoutItem(north_arrow)
